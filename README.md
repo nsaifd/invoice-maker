@@ -48,3 +48,4 @@ Optional: **Settings → Domains & Routes** → add a custom domain such as `inv
 
 ## Important
 Data lives only in the browser where it was created. Use **Settings → Export backup** regularly.
+
