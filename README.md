@@ -39,7 +39,7 @@ npm run preview:cf   # full app incl. Worker + local D1 at http://localhost:8787
 ```
 
 ## Deploy to Cloudflare (free)
-Live: https://invoice-maker.connect-saifd.workers.dev
+Live: https://involet.saifux.co (also https://invoice-maker.connect-saifd.workers.dev)
 
 The project is a Cloudflare Worker with static assets, configured in `wrangler.jsonc`:
 - `dist/` is served as a single-page app (routes like `/invoices/1` survive a refresh)
