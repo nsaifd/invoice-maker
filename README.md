@@ -15,6 +15,13 @@ Data is stored in the browser (IndexedDB). Hosted free on Cloudflare Pages.
 - Block-based builder with drag-and-drop: Cover, Text, Scope, Pricing, Timeline, Signature
 - Multi-page PDF, one-click convert to invoice
 
+**Templates**
+- 36 invoice designs across 10 layouts, 16 fonts (incl. Bangla), colors, table style, title, amount in words
+- 20 proposal themes: 6 cover styles × 4 heading styles, separate heading and body fonts
+- **Upload your own design** (PDF/PNG/JPG from Canva, Figma, Word): place live fields on top with a
+  drag-and-drop designer (move, resize, snap, hide sample text). Invoices keep their editable items and totals.
+  Proposals use an uploaded cover plus a letterhead; content is paginated inside a safe area you set.
+
 **Share links** (`/p/:id`)
 - Clients open proposals/invoices without logging in, comment, and accept or decline
 - E-signature (draw or type) with audit trail: name, email, time, IP address, browser

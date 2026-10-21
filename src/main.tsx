@@ -15,6 +15,7 @@ import ProposalView from './pages/ProposalView'
 import RecurringPage from './pages/RecurringPage'
 import PublicPage from './pages/PublicPage'
 import TemplatesPage from './pages/TemplatesPage'
+import TemplateDesigner from './pages/TemplateDesigner'
 
 // Ask the browser not to evict our IndexedDB data under storage pressure.
 navigator.storage?.persist?.().catch(() => {})
@@ -35,6 +36,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="proposals/:id/edit" element={<ProposalEditor />} />
           <Route path="recurring" element={<RecurringPage />} />
           <Route path="templates" element={<TemplatesPage />} />
+          <Route path="templates/design/new" element={<TemplateDesigner />} />
+          <Route path="templates/design/:id" element={<TemplateDesigner />} />
           <Route path="clients" element={<ClientsPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="settings" element={<SettingsPage />} />

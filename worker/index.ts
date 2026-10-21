@@ -9,7 +9,8 @@ interface Env {
 type Kind = 'proposal' | 'invoice'
 type Status = 'open' | 'accepted' | 'declined'
 
-const MAX_DOC_BYTES = 1_500_000
+// D1 rows are limited to 2 MB; uploaded designs are compressed JPEGs well below this.
+const MAX_DOC_BYTES = 1_900_000
 const MAX_SIGNATURE_BYTES = 300_000
 const MAX_EVENTS_PER_SHARE = 5000
 const MAX_COMMENTS_PER_SHARE = 200

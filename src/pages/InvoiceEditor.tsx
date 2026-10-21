@@ -18,6 +18,7 @@ export default function InvoiceEditor() {
   const settings = useSettings()
   const clients = useLiveQuery(() => db.clients.orderBy('name').toArray(), []) ?? []
   const products = useLiveQuery(() => db.products.orderBy('name').toArray(), []) ?? []
+  const uploads = useLiveQuery(() => db.templates.where('kind').equals('invoice').toArray(), []) ?? []
   const [inv, setInv] = useState<Invoice | null>(null)
   const [saveClient, setSaveClient] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -159,13 +160,24 @@ export default function InvoiceEditor() {
             />
             <select
               className={inputCls}
-              value={inv.style ? inv.style.preset : ''}
+              value={inv.style ? (inv.style.template === 'custom' ? `custom:${inv.style.customTemplateId}` : inv.style.preset) : ''}
               onChange={(e) => {
-                const p = presetById(e.target.value)
+                const v = e.target.value
+                if (v.startsWith('custom:')) return set({ style: { ...styleOf(settings), template: 'custom', preset: 'custom', customTemplateId: Number(v.slice(7)) } })
+                const p = presetById(v)
                 set({ style: p ? applyPreset(styleOf(settings), p) : undefined })
               }}
             >
-              <option value="">Default design ({presetById(settings.preset)?.name ?? 'Custom'})</option>
+              <option value="">Default design ({settings.template === 'custom' ? (uploads.find((t) => t.id === settings.customTemplateId)?.name ?? 'Your design') : (presetById(settings.preset)?.name ?? 'Custom')})</option>
+              {uploads.length > 0 && (
+                <optgroup label="My uploads">
+                  {uploads.map((t) => (
+                    <option key={t.id} value={`custom:${t.id}`}>
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
               {Object.entries(LAYOUTS).map(([layout, l]) => (
                 <optgroup key={layout} label={l.label}>
                   {PRESETS.filter((p) => p.template === layout).map((p) => (
@@ -175,7 +187,7 @@ export default function InvoiceEditor() {
                   ))}
                 </optgroup>
               ))}
-              {inv.style && !presetById(inv.style.preset) && <option value={inv.style.preset}>Custom</option>}
+              {inv.style && inv.style.template !== 'custom' && !presetById(inv.style.preset) && <option value={inv.style.preset}>Custom</option>}
             </select>
           </section>
 

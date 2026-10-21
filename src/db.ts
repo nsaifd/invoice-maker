@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 
 export type Currency = 'BDT' | 'USD' | 'EUR' | 'GBP' | 'INR'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid'
-export type TemplateId = 'minimal' | 'classic' | 'bold' | 'sidebar' | 'split' | 'elegant' | 'cards' | 'receipt' | 'corporate' | 'gradient'
+export type TemplateId = 'minimal' | 'classic' | 'bold' | 'sidebar' | 'split' | 'elegant' | 'cards' | 'receipt' | 'corporate' | 'gradient' | 'custom'
 export type FontId =
   | 'jakarta'
   | 'inter'
@@ -39,6 +39,96 @@ export interface DocStyle {
   showPayment: boolean
   showSignature: boolean
   footerText: string
+  /** Uploaded design used when template is 'custom'. */
+  customTemplateId?: number
+}
+
+export type CoverStyle = 'classic' | 'band' | 'fullbleed' | 'centered' | 'gradient' | 'minimal'
+export type HeadingStyle = 'bar' | 'number' | 'underline' | 'pill'
+
+/** How a proposal looks. Lives on Settings (the default) and optionally on a proposal. */
+export interface ProposalTheme {
+  preset: string
+  cover: CoverStyle
+  heading: HeadingStyle
+  accent: string
+  accent2: string
+  font: FontId
+  headingFont: FontId
+  /** Uploaded design (cover + letterhead) used instead of the built-in cover. */
+  customTemplateId?: number
+}
+
+// ---------- uploaded designs ----------
+
+export type ZoneType =
+  // invoice
+  | 'title'
+  | 'number'
+  | 'issueDate'
+  | 'dueDate'
+  | 'client'
+  | 'business'
+  | 'items'
+  | 'totals'
+  | 'amountDue'
+  | 'words'
+  | 'notes'
+  | 'terms'
+  | 'payment'
+  // proposal cover
+  | 'proposalTitle'
+  | 'subtitle'
+  | 'preparedFor'
+  | 'preparedBy'
+  | 'date'
+  | 'validUntil'
+  | 'proposalNumber'
+  | 'proposalTotal'
+  // both
+  | 'logo'
+  | 'signature'
+  | 'text'
+  | 'cover'
+
+/** A box placed on top of an uploaded design. Position and size are in millimetres on an A4 page. */
+export interface Zone {
+  id: string
+  type: ZoneType
+  x: number
+  y: number
+  w: number
+  h: number
+  fontSize: number
+  color: string
+  align: 'left' | 'center' | 'right'
+  bold: boolean
+  showLabel: boolean
+  /** Custom text zone content. */
+  text?: string
+  /** Background fill for 'cover' (hide) zones and table headers. */
+  fill?: string
+  font?: FontId
+}
+
+export interface CustomTemplate {
+  id?: number
+  kind: 'invoice' | 'proposal'
+  name: string
+  /** Invoice: the page. Proposal: the cover page. JPEG/PNG data URL, A4 portrait. */
+  background: string
+  zones: Zone[]
+  /** Proposal only: letterhead behind the content pages, and the safe area (mm) content stays inside. */
+  pageBackground?: string
+  margins?: { top: number; right: number; bottom: number; left: number }
+  /** Proposal only: text color on content pages (the cover's fields have their own colors). */
+  pageInk?: string
+  /** Default text color and font for content placed on this design. */
+  ink: string
+  font: FontId
+  accent: string
+  createdAt: number
+  updatedAt: number
 }
 
 export const STYLE_KEYS: Array<keyof DocStyle> = [
@@ -56,6 +146,7 @@ export const STYLE_KEYS: Array<keyof DocStyle> = [
   'showPayment',
   'showSignature',
   'footerText',
+  'customTemplateId',
 ]
 
 export interface PaymentDetails {
@@ -87,6 +178,7 @@ export interface Settings extends DocStyle {
   invoicePrefix: string
   nextNumber: number
   dueDays: number
+  proposalTheme: ProposalTheme
   proposalPrefix: string
   nextProposalNumber: number
   proposalValidDays: number
@@ -189,6 +281,8 @@ export interface Proposal {
   validUntil: string
   currency: Currency
   blocks: ProposalBlock[]
+  /** Per-proposal look; falls back to the default proposal theme in Settings. */
+  theme?: ProposalTheme
   share?: ShareRef
   acceptance?: Acceptance
   declined?: { name: string; reason: string; at: string }
@@ -219,6 +313,7 @@ class InvoiceDB extends Dexie {
   invoices!: EntityTable<Invoice, 'id'>
   proposals!: EntityTable<Proposal, 'id'>
   recurring!: EntityTable<RecurringRule, 'id'>
+  templates!: EntityTable<CustomTemplate, 'id'>
 
   constructor() {
     super('invoicekit')
@@ -231,6 +326,9 @@ class InvoiceDB extends Dexie {
     this.version(2).stores({
       proposals: '++id, number, status, clientId, date',
       recurring: '++id, nextDate, active',
+    })
+    this.version(3).stores({
+      templates: '++id, kind, name',
     })
   }
 }
@@ -267,6 +365,15 @@ export const defaultSettings: Settings = {
   showPayment: true,
   showSignature: true,
   footerText: '',
+  proposalTheme: {
+    preset: 'p-classic-blue',
+    cover: 'classic',
+    heading: 'bar',
+    accent: '#2563eb',
+    accent2: '#93c5fd',
+    font: 'jakarta',
+    headingFont: 'jakarta',
+  },
   proposalPrefix: 'PRO-',
   nextProposalNumber: 1,
   proposalValidDays: 30,
@@ -288,7 +395,14 @@ export const defaultSettings: Settings = {
 
 export async function getSettings(): Promise<Settings> {
   const saved = await db.settings.get('default')
-  return saved ? { ...defaultSettings, ...saved, payment: { ...defaultSettings.payment, ...saved.payment } } : defaultSettings
+  return saved
+    ? {
+        ...defaultSettings,
+        ...saved,
+        payment: { ...defaultSettings.payment, ...saved.payment },
+        proposalTheme: { ...defaultSettings.proposalTheme, ...saved.proposalTheme },
+      }
+    : defaultSettings
 }
 
 /** Returns undefined only while loading. */

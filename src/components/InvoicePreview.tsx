@@ -1,26 +1,52 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { withStyle, type Invoice, type Settings, type TemplateId } from '../db'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db, withStyle, type CustomTemplate, type Invoice, type Settings, type TemplateId } from '../db'
+import { CustomPage } from './CustomDesign'
 import { calcTotals, formatDate, formatMoney } from '../lib/invoice'
 import { AmountWords, ItemsTable, PaymentBlock, ScaledFrame, SignatureBlock, TotalsBox, docFont, lookOf, type Look } from './doc'
 import { initials } from './ui'
 
 type Ctx = { inv: Invoice; s: Settings; L: Look }
 
-/** Renders an invoice as an A4 page using its own design, or the default design from Settings. */
-export function InvoicePreview({ invoice, settings }: { invoice: Invoice; settings: Settings }) {
+/**
+ * Renders an invoice as an A4 page using its own design, or the default design from Settings.
+ * `customTemplate` is passed where the local database isn't available (the public share page).
+ */
+export function InvoicePreview({ invoice, settings, customTemplate }: { invoice: Invoice; settings: Settings; customTemplate?: CustomTemplate | null }) {
   const s = withStyle(settings, invoice.style)
+  if (s.template === 'custom') return <CustomInvoice invoice={invoice} s={s} given={customTemplate} />
+  return <BuiltIn invoice={invoice} s={s} />
+}
+
+function CustomInvoice({ invoice, s, given }: { invoice: Invoice; s: Settings; given?: CustomTemplate | null }) {
+  const loaded = useLiveQuery(() => (given || !s.customTemplateId ? null : db.templates.get(s.customTemplateId).then((t) => t ?? null)), [given, s.customTemplateId])
+  const template = given ?? loaded
+  if (template === undefined && !given && s.customTemplateId) return <div className="bg-white" style={{ width: '210mm', height: '297mm' }} />
+  // The uploaded design was deleted: fall back to a built-in look instead of a blank page.
+  if (!template) return <BuiltIn invoice={invoice} s={{ ...s, template: 'minimal' }} />
+  return (
+    <div className="invoice-doc relative">
+      <CustomPage template={template} background={template.background} zones={template.zones} data={{ s, invoice }} />
+      {invoice.status === 'paid' && <PaidStamp />}
+    </div>
+  )
+}
+
+const PaidStamp = () => (
+  <div className="pointer-events-none absolute right-[18mm] top-[58mm] z-10 rotate-[-12deg] rounded-lg border-[3px] border-emerald-500 bg-white/70 px-4 py-0.5 text-2xl font-extrabold tracking-[0.2em] text-emerald-500 opacity-80">
+    PAID
+  </div>
+)
+
+function BuiltIn({ invoice, s }: { invoice: Invoice; s: Settings }) {
   const L = lookOf(s)
-  const Layout = LAYOUT_COMPONENTS[s.template] ?? Minimal
+  const Layout = LAYOUT_COMPONENTS[s.template as Exclude<TemplateId, 'custom'>] ?? Minimal
   return (
     <div
       className="invoice-doc relative flex flex-col overflow-hidden bg-white leading-relaxed text-zinc-500"
       style={{ width: '210mm', minHeight: '297mm', fontFamily: docFont(s), fontSize: L.fontSize }}
     >
-      {invoice.status === 'paid' && (
-        <div className="pointer-events-none absolute right-[18mm] top-[58mm] z-10 rotate-[-12deg] rounded-lg border-[3px] border-emerald-500 bg-white/70 px-4 py-0.5 text-2xl font-extrabold tracking-[0.2em] text-emerald-500 opacity-80">
-          PAID
-        </div>
-      )}
+      {invoice.status === 'paid' && <PaidStamp />}
       <Layout inv={invoice} s={s} L={L} />
       {s.footerText.trim() && <div className="whitespace-pre-line px-[15mm] pb-[8mm] text-center text-[0.82em] text-zinc-400">{s.footerText}</div>}
     </div>
@@ -693,7 +719,7 @@ function Gradient({ inv, s, L }: Ctx) {
   )
 }
 
-const LAYOUT_COMPONENTS: Record<TemplateId, (c: Ctx) => ReactNode> = {
+const LAYOUT_COMPONENTS: Record<Exclude<TemplateId, 'custom'>, (c: Ctx) => ReactNode> = {
   minimal: Minimal,
   classic: Classic,
   bold: Bold,

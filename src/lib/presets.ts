@@ -1,6 +1,8 @@
 import type { DocStyle, FontId, TemplateId } from '../db'
 
-export const LAYOUTS: Record<TemplateId, { label: string; description: string }> = {
+export type BuiltInLayout = Exclude<TemplateId, 'custom'>
+
+export const LAYOUTS: Record<BuiltInLayout, { label: string; description: string }> = {
   minimal: { label: 'Minimal', description: 'Clean, airy and neutral' },
   classic: { label: 'Classic', description: 'Brand bar and colored table header' },
   bold: { label: 'Bold', description: 'Full brand-color header band' },
@@ -16,7 +18,7 @@ export const LAYOUTS: Record<TemplateId, { label: string; description: string }>
 export interface Preset {
   id: string
   name: string
-  template: TemplateId
+  template: BuiltInLayout
   accent: string
   accent2: string
   font: FontId
@@ -25,7 +27,7 @@ export interface Preset {
   title?: string
 }
 
-const p = (id: string, name: string, template: TemplateId, accent: string, accent2: string, font: FontId, table: Preset['table'], radius: Preset['radius'], title?: string): Preset => ({
+const p = (id: string, name: string, template: BuiltInLayout, accent: string, accent2: string, font: FontId, table: Preset['table'], radius: Preset['radius'], title?: string): Preset => ({
   id,
   name,
   template,
@@ -93,6 +95,7 @@ export function applyPreset(base: DocStyle, preset: Preset): DocStyle {
     ...base,
     preset: preset.id,
     template: preset.template,
+    customTemplateId: undefined,
     accentColor: preset.accent,
     accent2: preset.accent2,
     font: preset.font,
@@ -101,3 +104,5 @@ export function applyPreset(base: DocStyle, preset: Preset): DocStyle {
     docTitle: preset.title ?? (['Cash Memo', 'Receipt', 'Tax Invoice'].includes(base.docTitle) ? 'Invoice' : base.docTitle),
   }
 }
+
+export const layoutLabel = (t: TemplateId) => (t === 'custom' ? 'Your design' : LAYOUTS[t].label)

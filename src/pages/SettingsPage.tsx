@@ -4,7 +4,7 @@ import { Palette } from 'lucide-react'
 import { db, defaultSettings, useSettings, type Currency, type PaymentDetails, type Settings } from '../db'
 import { CURRENCIES } from '../lib/invoice'
 import { FONTS } from '../lib/fonts'
-import { LAYOUTS, PRESETS, presetById } from '../lib/presets'
+import { PRESETS, layoutLabel, presetById } from '../lib/presets'
 import { sampleInvoice } from '../lib/sample'
 import { InvoicePreview } from '../components/InvoicePreview'
 import { FitToWidth } from '../components/doc'
@@ -219,7 +219,7 @@ export default function SettingsPage() {
             <div>
               <h2 className="mb-1 font-semibold">Design & templates</h2>
               <p className="text-sm text-zinc-500">
-                Current design: <b className="text-zinc-800">{presetById(s.preset)?.name ?? 'Custom'}</b> · {LAYOUTS[s.template].label} layout · {FONTS[s.font].label}
+                Current design: <b className="text-zinc-800">{presetById(s.preset)?.name ?? 'Custom'}</b> · {layoutLabel(s.template)} layout · {FONTS[s.font].label}
               </p>
               <p className="mt-1 text-sm text-zinc-500">Choose from {PRESETS.length} designs, change colors, fonts, table style, title, amount in words and more.</p>
               <Link to="/templates" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700">

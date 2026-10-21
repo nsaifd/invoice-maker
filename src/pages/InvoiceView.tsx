@@ -113,7 +113,7 @@ export default function InvoiceView() {
         }
       />
 
-      <div className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="space-y-4">
           <div className="rounded-2xl border border-zinc-200 p-5">
             <div className="flex items-center justify-between">

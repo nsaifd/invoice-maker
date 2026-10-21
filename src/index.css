@@ -22,6 +22,10 @@ body {
     size: A4;
     margin: 14mm 0 16mm;
   }
+  @page cover {
+    size: A4;
+    margin: 0;
+  }
   body {
     background: #fff;
   }
@@ -36,10 +40,25 @@ body {
   .invoice-doc {
     min-height: 296mm !important;
   }
-  .proposal-doc {
+  /* Covers and uploaded-design pages are full-bleed A4 pages; flowing content uses page margins. */
+  .proposal-cover {
+    page: cover;
+    break-after: page;
+  }
+  .proposal-cover:last-child {
+    break-after: auto;
+  }
+  .proposal-cover > *,
+  .proposal-cover.relative {
+    height: 296.5mm !important;
+  }
+  .proposal-body {
     page: proposal;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
+  }
+  .custom-page {
+    height: 296.5mm !important;
   }
   .break-before {
     break-before: page;

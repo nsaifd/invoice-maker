@@ -22,7 +22,7 @@ export function SharePanel({
   dirty: boolean
   /** Signed proposals can't be republished. */
   locked?: boolean
-  makeDoc: () => SharedDoc
+  makeDoc: () => SharedDoc | Promise<SharedDoc>
   onChange: (share: ShareRef | undefined) => void | Promise<unknown>
   /** Text for the WhatsApp/email share; the link is appended. */
   message: { subject: string; body: string; email?: string; phone?: string }
@@ -54,7 +54,7 @@ export function SharePanel({
             ? 'Create a private link. Your client can read, comment, and accept with an e-signature — no login needed.'
             : 'Create a private link your client can open to view and download the invoice. You’ll see when they open it.'}
         </p>
-        <Button className="w-full" icon={Link2} disabled={busy} onClick={() => run(async () => onChange(await publish(kind, makeDoc())))}>
+        <Button className="w-full" icon={Link2} disabled={busy} onClick={() => run(async () => onChange(await publish(kind, await makeDoc())))}>
           {busy ? 'Creating…' : 'Create share link'}
         </Button>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
@@ -105,7 +105,7 @@ export function SharePanel({
       {dirty && !locked && (
         <div className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
           You changed this document after sharing it.
-          <Button className="mt-2 w-full" icon={RefreshCw} disabled={busy} onClick={() => run(async () => onChange(await republish(share, makeDoc())))}>
+          <Button className="mt-2 w-full" icon={RefreshCw} disabled={busy} onClick={() => run(async () => onChange(await republish(share, await makeDoc())))}>
             {busy ? 'Updating…' : 'Update shared version'}
           </Button>
         </div>

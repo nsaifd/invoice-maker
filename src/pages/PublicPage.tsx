@@ -68,7 +68,12 @@ export default function PublicPage() {
 
   const settings = { ...data.doc.settings, id: 'default', nextNumber: 0, nextProposalNumber: 0 } as Settings
   const { proposal, invoice } = data.doc
-  const doc = proposal ? <ProposalDocument proposal={proposal} settings={settings} acceptance={data.acceptance} /> : invoice ? <InvoicePreview invoice={invoice} settings={settings} /> : null
+  const custom = data.doc.customTemplate ?? null
+  const doc = proposal ? (
+    <ProposalDocument proposal={proposal} settings={settings} acceptance={data.acceptance} customTemplate={custom} />
+  ) : invoice ? (
+    <InvoicePreview invoice={invoice} settings={settings} customTemplate={custom} />
+  ) : null
   const total = proposal ? formatMoney(proposalTotal(proposal), proposal.currency) : invoice ? formatMoney(calcTotals(invoice).total, invoice.currency) : ''
   const canRespond = data.kind === 'proposal' && data.status === 'open'
 

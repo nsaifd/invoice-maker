@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -8,6 +8,7 @@ import { Calendar, ChevronDown, ChevronUp, Copy, GripVertical, Hash, Plus, Trash
 import { db, formatProposalNumber, getSettings, useSettings, type Currency, type Product, type Proposal, type ProposalBlock, type Settings } from '../db'
 import { CURRENCIES, uid } from '../lib/invoice'
 import { BLOCKS, PRESETS, blockTitle, newProposal } from '../lib/proposal'
+import { COVERS, THEMES, applyTheme, themeById } from '../lib/proposalThemes'
 import { ClientFields, ClientPicker } from '../components/ClientFields'
 import { LineItemsEditor, ProductPicker } from '../components/LineItemsEditor'
 import { ProposalDocument } from '../components/ProposalDocument'
@@ -22,6 +23,7 @@ export default function ProposalEditor() {
   const settings = useSettings()
   const clients = useLiveQuery(() => db.clients.orderBy('name').toArray(), []) ?? []
   const products = useLiveQuery(() => db.products.orderBy('name').toArray(), []) ?? []
+  const uploads = useLiveQuery(() => db.templates.where('kind').equals('proposal').toArray(), []) ?? []
   const [doc, setDoc] = useState<Proposal | null>(null)
   const [saveClient, setSaveClient] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -158,6 +160,55 @@ export default function ProposalEditor() {
                   Save this client for future documents
                 </label>
               )}
+            </section>
+            <section className="p-6">
+              <SectionTitle
+                title="Theme"
+                subtitle="Use your default theme, or pick one for this proposal."
+                action={
+                  <Link to="/templates?tab=proposal" className="text-sm font-medium text-blue-600 hover:underline">
+                    Browse themes →
+                  </Link>
+                }
+              />
+              <select
+                className={inputCls}
+                value={doc.theme ? (doc.theme.customTemplateId ? `custom:${doc.theme.customTemplateId}` : doc.theme.preset) : ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (!v) return set({ theme: undefined })
+                  if (v.startsWith('custom:')) return set({ theme: { ...settings.proposalTheme, preset: 'custom', customTemplateId: Number(v.slice(7)) } })
+                  const t = themeById(v)
+                  if (t) set({ theme: applyTheme(settings.proposalTheme, t) })
+                }}
+              >
+                <option value="">
+                  Default theme (
+                  {settings.proposalTheme.customTemplateId
+                    ? (uploads.find((u) => u.id === settings.proposalTheme.customTemplateId)?.name ?? 'Your design')
+                    : (themeById(settings.proposalTheme.preset)?.name ?? 'Custom')}
+                  )
+                </option>
+                {uploads.length > 0 && (
+                  <optgroup label="My uploads">
+                    {uploads.map((u) => (
+                      <option key={u.id} value={`custom:${u.id}`}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {Object.entries(COVERS).map(([cover, c]) => (
+                  <optgroup key={cover} label={`${c.label} cover`}>
+                    {THEMES.filter((t) => t.cover === cover).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+                {doc.theme && !doc.theme.customTemplateId && !themeById(doc.theme.preset) && <option value={doc.theme.preset}>Custom</option>}
+              </select>
             </section>
           </div>
 

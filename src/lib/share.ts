@@ -1,4 +1,4 @@
-import type { Acceptance, Invoice, Proposal, Settings, ShareRef } from '../db'
+import { db, styleOf, type Acceptance, type CustomTemplate, type Invoice, type Proposal, type Settings, type ShareRef } from '../db'
 
 // Client for the share-link API in worker/index.ts.
 
@@ -9,6 +9,8 @@ export interface SharedDoc {
   settings: Omit<Settings, 'id' | 'nextNumber' | 'nextProposalNumber'>
   proposal?: Proposal
   invoice?: Invoice
+  /** Uploaded design the document uses, embedded so the client sees it without our local data. */
+  customTemplate?: CustomTemplate
 }
 
 export interface Comment {
@@ -53,13 +55,17 @@ async function api<T>(path: string, init: RequestInit & { ownerKey?: string } = 
 }
 
 /** Strips private fields (owner key, reminders) before a document leaves the browser. */
-export function snapshot(settings: Settings, doc: { proposal?: Proposal; invoice?: Invoice }): SharedDoc {
+export async function snapshot(settings: Settings, doc: { proposal?: Proposal; invoice?: Invoice }): Promise<SharedDoc> {
+  const style = doc.invoice ? (doc.invoice.style ?? styleOf(settings)) : undefined
+  const templateId = doc.proposal ? (doc.proposal.theme ?? settings.proposalTheme).customTemplateId : style?.template === 'custom' ? style.customTemplateId : undefined
+  const customTemplate = templateId ? await db.templates.get(templateId) : undefined
   const { id: _id, nextNumber: _n, nextProposalNumber: _p, ...publicSettings } = settings
   const clean = <T extends { share?: ShareRef }>(d?: T) => d && { ...d, share: undefined }
   return {
     settings: publicSettings,
     proposal: doc.proposal && { ...clean(doc.proposal)!, acceptance: undefined, declined: undefined, invoiceId: undefined },
     invoice: doc.invoice && { ...clean(doc.invoice)!, reminders: undefined, recurringId: undefined },
+    customTemplate,
   }
 }
 
