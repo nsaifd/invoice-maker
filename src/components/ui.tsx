@@ -2,6 +2,7 @@ import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type Re
 import { Link } from 'react-router-dom'
 import { ChevronRight, type LucideIcon } from 'lucide-react'
 import type { DisplayStatus } from '../lib/invoice'
+import type { ProposalDisplayStatus } from '../lib/proposal'
 
 export const inputCls =
   'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
@@ -103,14 +104,18 @@ export function Modal({ open, title, onClose, children }: { open: boolean; title
   )
 }
 
-const statusStyles: Record<DisplayStatus, string> = {
+const statusStyles: Record<string, string> = {
   draft: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
   sent: 'bg-blue-50 text-blue-700 ring-blue-100',
+  viewed: 'bg-violet-50 text-violet-700 ring-violet-100',
   paid: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+  accepted: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
   overdue: 'bg-red-50 text-red-700 ring-red-100',
+  declined: 'bg-red-50 text-red-700 ring-red-100',
+  expired: 'bg-amber-50 text-amber-700 ring-amber-100',
 }
 
-export function StatusBadge({ status }: { status: DisplayStatus }) {
+export function StatusBadge({ status }: { status: DisplayStatus | ProposalDisplayStatus }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ring-1 ring-inset ${statusStyles[status]}`}>
       <span className="h-1.5 w-1.5 rounded-full bg-current" />

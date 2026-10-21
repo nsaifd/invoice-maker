@@ -1,16 +1,24 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, Copy, Download, Mail, Pencil, RotateCcw, Send, Trash2 } from 'lucide-react'
-import { db, formatInvoiceNumber, getSettings, useSettings, type Invoice } from '../db'
+import { BellRing, CheckCircle2, Copy, Download, Mail, MessageCircle, Pencil, Repeat, RotateCcw, Send, Trash2 } from 'lucide-react'
+import { db, formatInvoiceNumber, getSettings, useSettings, type Frequency, type Invoice } from '../db'
 import { addDays, calcTotals, displayStatus, formatDate, formatMoney, todayISO, uid } from '../lib/invoice'
-import { ScaledPreview } from '../components/InvoicePreview'
-import { Button, PageHeader, StatusBadge } from '../components/ui'
+import { FREQUENCIES, nextOccurrence, openReminder, ruleFromInvoice } from '../lib/recurring'
+import { shareUrl, snapshot, timeAgo } from '../lib/share'
+import { InvoicePreview, ScaledPreview } from '../components/InvoicePreview'
+import { PrintPortal } from '../components/doc'
+import { ActivityPanel, CommentsPanel, SharePanel, useActivity } from '../components/SharePanel'
+import { Button, Field, Modal, PageHeader, StatusBadge, inputCls } from '../components/ui'
 
 export default function InvoiceView() {
   const id = Number(useParams().id)
   const navigate = useNavigate()
   const settings = useSettings()
   const inv = useLiveQuery(() => db.invoices.get(id).then((x) => x ?? null), [id])
+  const rule = useLiveQuery(() => (inv?.recurringId ? db.recurring.get(inv.recurringId) : undefined), [inv?.recurringId])
+  const [recurringOpen, setRecurringOpen] = useState(false)
+  const { activity, error, reload } = useActivity(inv?.share)
 
   if (!settings || inv === undefined) return null
   if (inv === null)
@@ -26,6 +34,8 @@ export default function InvoiceView() {
   const status = displayStatus(inv)
   const total = formatMoney(calcTotals(inv).total, inv.currency)
   const update = (patch: Partial<Invoice>) => db.invoices.update(id, { ...patch, updatedAt: Date.now() })
+  const link = inv.share ? shareUrl(inv.share.id) : undefined
+  const lastReminder = inv.reminders?.at(-1)
 
   function downloadPdf() {
     // The browser's "Save as PDF" uses the document title as the file name.
@@ -41,7 +51,8 @@ export default function InvoiceView() {
     const body = [
       `Hi ${inv!.client.name},`,
       '',
-      `Please find attached invoice ${inv!.number} for ${total}, due on ${formatDate(inv!.dueDate)}.`,
+      `Please find ${link ? 'below' : 'attached'} invoice ${inv!.number} for ${total}, due on ${formatDate(inv!.dueDate)}.`,
+      link ? `\nView and download it online: ${link}` : '',
       '',
       'Thank you,',
       settings!.businessName,
@@ -59,6 +70,9 @@ export default function InvoiceView() {
       number: formatInvoiceNumber(s),
       status: 'draft',
       paidAt: undefined,
+      share: undefined,
+      reminders: undefined,
+      recurringId: undefined,
       issueDate,
       dueDate: addDays(issueDate, s.dueDays),
       items: inv!.items.map((i) => ({ ...i, id: uid() })),
@@ -99,8 +113,8 @@ export default function InvoiceView() {
         }
       />
 
-      <div className="grid items-start gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="space-y-4 xl:sticky xl:top-4 print:hidden">
+      <div className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="space-y-4">
           <div className="rounded-2xl border border-zinc-200 p-5">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-zinc-500">Status</span>
@@ -130,9 +144,66 @@ export default function InvoiceView() {
               )}
             </div>
           </div>
-          <p className="px-1 text-xs leading-relaxed text-zinc-500">
-            <b>Download PDF</b> opens the print dialog — choose <b>Save as PDF</b>. <b>Email</b> opens your mail app; attach the downloaded PDF before sending.
-          </p>
+
+          {inv.status === 'sent' && (
+            <div className={`rounded-2xl border p-5 ${status === 'overdue' ? 'border-red-200 bg-red-50/40' : 'border-zinc-200'}`}>
+              <div className="mb-1 flex items-center gap-2 font-semibold text-zinc-900">
+                <BellRing className="h-4 w-4" /> Payment reminder
+              </div>
+              <p className="mb-3 text-sm text-zinc-500">
+                {lastReminder ? `Last reminded ${timeAgo(lastReminder.at)} via ${lastReminder.channel === 'email' ? 'email' : 'WhatsApp'}.` : 'Send a friendly reminder with one click.'}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="secondary" icon={Mail} onClick={() => openReminder('email', inv, settings, link)}>
+                  Email
+                </Button>
+                <Button variant="secondary" icon={MessageCircle} onClick={() => openReminder('whatsapp', inv, settings, link)}>
+                  WhatsApp
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-zinc-200 p-5">
+            <div className="mb-1 flex items-center gap-2 font-semibold text-zinc-900">
+              <Repeat className="h-4 w-4" /> Recurring
+            </div>
+            {rule ? (
+              <p className="text-sm text-zinc-500">
+                {FREQUENCIES[rule.frequency]} · {rule.active ? `next on ${formatDate(rule.nextDate)}` : 'paused'}.{' '}
+                <Link to="/recurring" className="font-medium text-blue-600 hover:underline">
+                  Manage
+                </Link>
+              </p>
+            ) : (
+              <>
+                <p className="mb-3 text-sm text-zinc-500">Bill this client on a schedule — new invoices are created automatically.</p>
+                <Button variant="secondary" icon={Repeat} className="w-full" onClick={() => setRecurringOpen(true)}>
+                  Make recurring
+                </Button>
+              </>
+            )}
+          </div>
+
+          <SharePanel
+            kind="invoice"
+            share={inv.share}
+            dirty={!!inv.share && inv.updatedAt > inv.share.publishedAt}
+            makeDoc={() => snapshot(settings, { invoice: inv })}
+            onChange={(share) => db.invoices.update(id, { share })}
+            message={{
+              subject: `Invoice ${inv.number} from ${settings.businessName}`,
+              body: `Hi ${inv.client.name},\n\nHere is invoice ${inv.number} for ${total}, due on ${formatDate(inv.dueDate)}. You can view and download it here:`,
+              email: inv.client.email,
+              phone: inv.client.phone,
+            }}
+          />
+          {inv.share && (
+            <>
+              <ActivityPanel activity={activity} error={error} />
+              <CommentsPanel share={inv.share} activity={activity} ownerName={settings.businessName} onPosted={reload} />
+            </>
+          )}
         </aside>
 
         <ScaledPreview
@@ -153,7 +224,66 @@ export default function InvoiceView() {
           }
         />
       </div>
+
+      <RecurringModal open={recurringOpen} onClose={() => setRecurringOpen(false)} invoice={inv} />
+      <PrintPortal>
+        <InvoicePreview invoice={inv} settings={settings} />
+      </PrintPortal>
     </>
+  )
+}
+
+function RecurringModal({ open, onClose, invoice }: { open: boolean; onClose: () => void; invoice: Invoice }) {
+  const [frequency, setFrequency] = useState<Frequency>('monthly')
+  const [nextDate, setNextDate] = useState(() => nextOccurrence(invoice.issueDate, 'monthly'))
+  const [endDate, setEndDate] = useState('')
+  async function save() {
+    await db.transaction('rw', db.recurring, db.invoices, async () => {
+      const ruleId = await db.recurring.add(ruleFromInvoice(invoice, frequency, nextDate, endDate))
+      await db.invoices.update(invoice.id!, { recurringId: ruleId })
+    })
+    onClose()
+  }
+  return (
+    <Modal open={open} title="Make this invoice recurring" onClose={onClose}>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Repeat" className="sm:col-span-2">
+          <select
+            className={inputCls}
+            value={frequency}
+            onChange={(e) => {
+              const f = e.target.value as Frequency
+              setFrequency(f)
+              setNextDate(nextOccurrence(invoice.issueDate, f))
+            }}
+          >
+            {Object.entries(FREQUENCIES).map(([k, label]) => (
+              <option key={k} value={k}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Next invoice on">
+          <input type="date" className={inputCls} value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
+        </Field>
+        <Field label="End date (optional)">
+          <input type="date" className={inputCls} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </Field>
+      </div>
+      <p className="mt-4 rounded-lg bg-zinc-50 p-3 text-xs text-zinc-500">
+        A draft copy of this invoice is created on each date, with a new number. Because your data lives in this browser, invoices are created the next time you open InvoiceKit on or
+        after that date.
+      </p>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button icon={Repeat} onClick={save} disabled={!nextDate}>
+          Start schedule
+        </Button>
+      </div>
+    </Modal>
   )
 }
 

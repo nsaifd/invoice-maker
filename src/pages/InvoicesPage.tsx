@@ -1,9 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertCircle, CheckCircle2, Clock, FileText, Plus, Search, type LucideIcon } from 'lucide-react'
+import { AlertCircle, BellRing, CheckCircle2, Clock, FileText, Mail, MessageCircle, Plus, Search, type LucideIcon } from 'lucide-react'
 import { db, useSettings } from '../db'
-import { calcTotals, displayStatus, formatDate, formatMoney, todayISO, type DisplayStatus } from '../lib/invoice'
+import { addDays, calcTotals, displayStatus, formatDate, formatMoney, todayISO, type DisplayStatus } from '../lib/invoice'
+import { openReminder } from '../lib/recurring'
+import { shareUrl, timeAgo } from '../lib/share'
 import { PageHeader, StatusBadge, initials, inputCls } from '../components/ui'
 
 const filters: Array<'all' | DisplayStatus> = ['all', 'draft', 'sent', 'overdue', 'paid']
@@ -33,6 +35,9 @@ export default function InvoicesPage() {
   const paidMonth = inCur.filter((r) => r.status === 'paid' && r.inv.paidAt?.startsWith(month))
   const sum = (xs: typeof rows) => xs.reduce((a, r) => a + r.total, 0)
   const count = (n: number) => `${n} invoice${n === 1 ? '' : 's'}`
+
+  const soon = addDays(todayISO(), 3)
+  const attention = rows.filter((r) => r.status === 'overdue' || (r.status === 'sent' && r.inv.dueDate <= soon)).sort((a, b) => a.inv.dueDate.localeCompare(b.inv.dueDate))
 
   const needle = q.trim().toLowerCase()
   const visible = rows.filter(
@@ -72,6 +77,42 @@ export default function InvoicesPage() {
         <Stat icon={AlertCircle} label="Overdue" value={formatMoney(sum(overdue), cur)} sub={count(overdue.length)} tone="red" />
         <Stat icon={CheckCircle2} label="Paid this month" value={formatMoney(sum(paidMonth), cur)} sub={count(paidMonth.length)} tone="green" />
       </div>
+
+      {attention.length > 0 && (
+        <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50/40">
+          <div className="flex items-center gap-2 px-5 pt-4 font-semibold text-zinc-900">
+            <BellRing className="h-4 w-4 text-amber-600" /> Needs attention
+            <span className="text-xs font-normal text-zinc-500">overdue or due in the next 3 days</span>
+          </div>
+          <div className="divide-y divide-amber-100 px-5 pb-2">
+            {attention.slice(0, 6).map(({ inv, status, total }) => {
+              const last = inv.reminders?.at(-1)
+              const link = inv.share ? shareUrl(inv.share.id) : undefined
+              return (
+                <div key={inv.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 text-sm">
+                  <Link to={`/invoices/${inv.id}`} className="min-w-40 flex-1">
+                    <span className="font-medium text-zinc-900">{inv.client.name}</span>
+                    <span className="ml-2 text-zinc-500">{inv.number}</span>
+                    <span className={`block text-xs ${status === 'overdue' ? 'text-red-600' : 'text-amber-700'}`}>
+                      {status === 'overdue' ? 'Overdue since' : 'Due'} {formatDate(inv.dueDate)}
+                      {last && <span className="text-zinc-500"> · reminded {timeAgo(last.at)}</span>}
+                    </span>
+                  </Link>
+                  <span className="font-semibold text-zinc-900">{formatMoney(total, inv.currency)}</span>
+                  <div className="flex gap-1.5">
+                    <button type="button" onClick={() => openReminder('email', inv, settings, link)} className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
+                      <Mail className="h-3.5 w-3.5" /> Remind
+                    </button>
+                    <button type="button" onClick={() => openReminder('whatsapp', inv, settings, link)} className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
+                      <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {invoices.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 py-16 text-center">

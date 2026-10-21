@@ -1,12 +1,13 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Calendar, ChevronDown, Hash, Plus, Trash2 } from 'lucide-react'
-import { db, emptyClient, formatInvoiceNumber, getSettings, useSettings, type Currency, type Invoice, type LineItem } from '../db'
-import { CURRENCIES, calcTotals, formatMoney, newInvoice, newLineItem } from '../lib/invoice'
-import { ClientFields } from '../components/ClientFields'
+import { Calendar, Hash } from 'lucide-react'
+import { db, formatInvoiceNumber, getSettings, useSettings, type Currency, type Invoice } from '../db'
+import { CURRENCIES, newInvoice } from '../lib/invoice'
+import { LineItemsEditor, ProductPicker } from '../components/LineItemsEditor'
+import { ClientFields, ClientPicker } from '../components/ClientFields'
 import { ScaledPreview } from '../components/InvoicePreview'
-import { Button, Field, IconInput, PageHeader, SectionTitle, Toggle, initials, inputCls } from '../components/ui'
+import { Button, Field, IconInput, PageHeader, SectionTitle, Toggle, inputCls } from '../components/ui'
 
 const PREVIEW_KEY = 'invoicekit.showPreview'
 
@@ -19,7 +20,6 @@ export default function InvoiceEditor() {
   const [inv, setInv] = useState<Invoice | null>(null)
   const [saveClient, setSaveClient] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [discountOn, setDiscountOn] = useState(false)
   const [showPreview, setShowPreview] = useState(() => {
     try {
       return localStorage.getItem(PREVIEW_KEY) !== '0'
@@ -34,7 +34,6 @@ export default function InvoiceEditor() {
       db.invoices.get(Number(id)).then((found) => {
         if (!found) return navigate('/', { replace: true })
         setInv(found)
-        setDiscountOn(found.discountValue > 0)
       })
     else setInv(newInvoice(settings))
   }, [id, settings, inv, navigate])
@@ -42,10 +41,6 @@ export default function InvoiceEditor() {
   if (!settings || !inv) return null
 
   const set = (patch: Partial<Invoice>) => setInv((v) => v && { ...v, ...patch })
-  const setItem = (idx: number, patch: Partial<LineItem>) => set({ items: inv.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) })
-  const totals = calcTotals(inv)
-  const money = (c: number) => formatMoney(c, inv.currency)
-  const taxLabel = settings.taxLabel || 'Tax'
 
   function togglePreview(v: boolean) {
     setShowPreview(v)
@@ -82,34 +77,8 @@ export default function InvoiceEditor() {
     navigate(`/invoices/${savedId}`)
   }
 
-  const clientPicker = clients.length > 0 && (
-    <div className="relative flex items-center gap-2.5 rounded-full border border-zinc-200 bg-white py-1.5 pl-1.5 pr-9 shadow-xs">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-        {initials(inv.client.name || '+')}
-      </span>
-      <span className="min-w-0 max-w-44">
-        <span className="block truncate text-sm font-medium text-zinc-900">{inv.clientId ? inv.client.name : 'New client'}</span>
-        <span className="block truncate text-xs text-zinc-500">{inv.clientId ? inv.client.email || inv.client.company : 'or pick a saved one'}</span>
-      </span>
-      <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-zinc-400" />
-      <select
-        aria-label="Saved client"
-        className="absolute inset-0 cursor-pointer opacity-0"
-        value={inv.clientId ?? ''}
-        onChange={(e) => {
-          const c = clients.find((x) => x.id === Number(e.target.value))
-          set(c ? { clientId: c.id, client: { name: c.name, company: c.company, email: c.email, phone: c.phone, address: c.address } } : { clientId: undefined, client: { ...emptyClient } })
-        }}
-      >
-        <option value="">— New client —</option>
-        {clients.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-            {c.company ? ` (${c.company})` : ''}
-          </option>
-        ))}
-      </select>
-    </div>
+  const clientPicker = (
+    <ClientPicker clients={clients} clientId={inv.clientId} client={inv.client} onSelect={(clientId, client) => set({ clientId, client })} />
   )
 
   return (
@@ -172,119 +141,9 @@ export default function InvoiceEditor() {
             <SectionTitle
               title="Product Details"
               subtitle="What are you billing for?"
-              action={
-                products.length > 0 && (
-                  <select
-                    className={`${inputCls} w-auto py-2`}
-                    value=""
-                    onChange={(e) => {
-                      const p = products.find((x) => x.id === Number(e.target.value))
-                      if (!p) return
-                      const item = newLineItem(settings, { description: p.description ? `${p.name}\n${p.description}` : p.name, rate: p.rate })
-                      // Replace the initial empty row instead of leaving it dangling.
-                      const items = inv.items.filter((i) => i.description.trim() || Number(i.rate))
-                      set({ items: [...items, item] })
-                    }}
-                  >
-                    <option value="">+ Add saved product…</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} — {formatMoney(Math.round(p.rate * 100), inv.currency)}
-                      </option>
-                    ))}
-                  </select>
-                )
-              }
+              action={<ProductPicker products={products} currency={inv.currency} settings={settings} items={inv.items} onAdd={(items) => set({ items })} />}
             />
-
-            <div className="@container overflow-hidden rounded-xl border border-zinc-200">
-              <div className="hidden grid-cols-[minmax(0,1fr)_60px_100px_60px_112px_32px] gap-2 bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-500 @2xl:grid">
-                <span>Item</span>
-                <span>Qty</span>
-                <span>Rate</span>
-                <span>{taxLabel} %</span>
-                <span>Total</span>
-                <span />
-              </div>
-              <div className="divide-y divide-zinc-100">
-                {inv.items.map((item, i) => (
-                  <div key={item.id} className="grid grid-cols-[1fr_1fr_1fr_32px] gap-2 p-3 @md:grid-cols-[1fr_1fr_1fr_1.4fr_32px] @2xl:grid-cols-[minmax(0,1fr)_60px_100px_60px_112px_32px] @2xl:items-start">
-                    <textarea
-                      rows={1}
-                      placeholder="Item name"
-                      className={`${inputCls} col-span-4 min-h-[38px] resize-y py-2 @md:col-span-5 @2xl:col-span-1`}
-                      value={item.description}
-                      onChange={(e) => setItem(i, { description: e.target.value })}
-                    />
-                    <NumInput label="Qty" value={item.qty} onChange={(qty) => setItem(i, { qty })} />
-                    <NumInput label="Rate" value={item.rate} onChange={(rate) => setItem(i, { rate })} />
-                    <NumInput label={`${taxLabel} %`} value={item.taxRate} onChange={(taxRate) => setItem(i, { taxRate })} />
-                    <div className="col-span-3 @md:col-span-1">
-                      <span className="mb-0.5 block text-[11px] text-zinc-500 @2xl:hidden">Total</span>
-                      <div className="truncate rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-sm text-zinc-600">{money(totals.lines[i])}</div>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label="Remove item"
-                      className="flex h-[38px] items-center justify-center self-end rounded-lg text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:invisible @2xl:self-start"
-                      disabled={inv.items.length === 1}
-                      onClick={() => set({ items: inv.items.filter((_, j) => j !== i) })}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                className="flex w-full items-center justify-center gap-1.5 border-t border-zinc-200 bg-zinc-50/60 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
-                onClick={() => set({ items: [...inv.items, newLineItem(settings)] })}
-              >
-                <Plus className="h-4 w-4" /> Add Item
-              </button>
-            </div>
-
-            <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-3">
-                <label className="flex items-center gap-2.5 text-sm font-medium text-zinc-800">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-blue-600"
-                    checked={discountOn}
-                    onChange={(e) => {
-                      setDiscountOn(e.target.checked)
-                      if (!e.target.checked) set({ discountValue: 0 })
-                    }}
-                  />
-                  Add Discount
-                </label>
-                {discountOn && (
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      aria-label="Discount"
-                      className={`${inputCls} w-28`}
-                      value={inv.discountValue}
-                      onChange={(e) => set({ discountValue: Number(e.target.value) })}
-                    />
-                    <select className={`${inputCls} w-auto`} value={inv.discountType} onChange={(e) => set({ discountType: e.target.value as Invoice['discountType'] })}>
-                      <option value="percent">%</option>
-                      <option value="fixed">{CURRENCIES[inv.currency].symbol} fixed</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-              <div className="w-full space-y-2 rounded-xl bg-zinc-50 p-4 text-sm sm:w-72">
-                <TotalRow label="Subtotal" value={money(totals.subtotal)} />
-                {totals.discount > 0 && <TotalRow label="Discount" value={`-${money(totals.discount)}`} />}
-                <TotalRow label={taxLabel} value={money(totals.tax)} />
-                <div className="flex justify-between border-t border-zinc-200 pt-2 text-base font-semibold text-zinc-900">
-                  <span>Grand Total</span>
-                  <span>{money(totals.total)}</span>
-                </div>
-              </div>
-            </div>
+            <LineItemsEditor key={inv.id ?? 'new'} value={inv} onChange={set} currency={inv.currency} settings={settings} />
           </section>
 
           <section className="p-6">
@@ -307,31 +166,5 @@ export default function InvoiceEditor() {
         )}
       </div>
     </>
-  )
-}
-
-function NumInput({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
-  return (
-    <label>
-      <span className="mb-0.5 block text-[11px] text-zinc-500 @2xl:hidden">{label}</span>
-      <input
-        type="number"
-        min={0}
-        step="any"
-        aria-label={label}
-        className={`${inputCls} px-2.5 py-2`}
-        value={Number.isNaN(value) ? '' : value}
-        onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
-      />
-    </label>
-  )
-}
-
-function TotalRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-8 text-zinc-600">
-      <span>{label}</span>
-      <span className="font-medium text-zinc-800">{value}</span>
-    </div>
   )
 }

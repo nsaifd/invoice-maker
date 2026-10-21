@@ -1,19 +1,34 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, Menu, Package, Search, Settings, Users, X, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, FileSignature, FileText, Menu, Package, Repeat, Search, Settings, Users, X, type LucideIcon } from 'lucide-react'
+import { runRecurring } from '../lib/recurring'
 import { useSettings } from '../db'
 import { initials } from './ui'
 
 const menu: Array<{ to: string; label: string; icon: LucideIcon; end?: boolean }> = [
   { to: '/', label: 'Invoices', icon: FileText, end: true },
+  { to: '/proposals', label: 'Proposals', icon: FileSignature },
+  { to: '/recurring', label: 'Recurring', icon: Repeat },
   { to: '/clients', label: 'Clients', icon: Users },
   { to: '/products', label: 'Products', icon: Package },
 ]
 
 export function Layout() {
   const [open, setOpen] = useState(false)
+  const [toast, setToast] = useState('')
   const { pathname } = useLocation()
   useEffect(() => setOpen(false), [pathname])
+
+  // Create any recurring invoices that came due while the app was closed.
+  useEffect(() => {
+    runRecurring()
+      .then((n) => {
+        if (!n) return
+        setToast(`${n} recurring invoice${n === 1 ? ' was' : 's were'} created as draft${n === 1 ? '' : 's'}.`)
+        setTimeout(() => setToast(''), 6000)
+      })
+      .catch(console.error)
+  }, [])
 
   return (
     <div className="min-h-screen lg:flex">
@@ -37,6 +52,12 @@ export function Layout() {
             </button>
             <Sidebar />
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div role="status" className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-3 text-sm text-white shadow-lg">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" /> {toast}
         </div>
       )}
 

@@ -8,30 +8,43 @@ body {
   @apply bg-zinc-100 text-zinc-800 antialiased;
 }
 
+/* Documents are rendered into #print-root (see PrintPortal) and only that is printed. */
+#print-root {
+  display: none;
+}
+
 @media print {
   @page {
     size: A4;
     margin: 0;
   }
+  @page proposal {
+    size: A4;
+    margin: 14mm 0 16mm;
+  }
   body {
     background: #fff;
   }
-  body * {
-    visibility: hidden;
+  #root {
+    display: none !important;
   }
-  .print-area,
-  .print-area * {
-    visibility: visible;
-  }
-  .preview-zoom {
-    zoom: 1 !important;
-  }
-  .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    box-shadow: none !important;
+  #print-root {
+    display: block;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  .invoice-doc {
+    min-height: 296mm !important;
+  }
+  .proposal-doc {
+    page: proposal;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  .break-before {
+    break-before: page;
+  }
+  .avoid-break {
+    break-inside: avoid;
   }
 }
