@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Calendar, Hash } from 'lucide-react'
-import { db, formatInvoiceNumber, getSettings, useSettings, type Currency, type Invoice } from '../db'
+import { styleOf, db, formatInvoiceNumber, getSettings, useSettings, type Currency, type Invoice } from '../db'
 import { CURRENCIES, newInvoice } from '../lib/invoice'
+import { LAYOUTS, PRESETS, applyPreset, presetById } from '../lib/presets'
 import { LineItemsEditor, ProductPicker } from '../components/LineItemsEditor'
 import { ClientFields, ClientPicker } from '../components/ClientFields'
 import { ScaledPreview } from '../components/InvoicePreview'
@@ -144,6 +145,38 @@ export default function InvoiceEditor() {
               action={<ProductPicker products={products} currency={inv.currency} settings={settings} items={inv.items} onAdd={(items) => set({ items })} />}
             />
             <LineItemsEditor key={inv.id ?? 'new'} value={inv} onChange={set} currency={inv.currency} settings={settings} />
+          </section>
+
+          <section className="p-6">
+            <SectionTitle
+              title="Design"
+              subtitle="Use your default design, or pick a different one for this invoice."
+              action={
+                <Link to="/templates" className="text-sm font-medium text-blue-600 hover:underline">
+                  Browse templates →
+                </Link>
+              }
+            />
+            <select
+              className={inputCls}
+              value={inv.style ? inv.style.preset : ''}
+              onChange={(e) => {
+                const p = presetById(e.target.value)
+                set({ style: p ? applyPreset(styleOf(settings), p) : undefined })
+              }}
+            >
+              <option value="">Default design ({presetById(settings.preset)?.name ?? 'Custom'})</option>
+              {Object.entries(LAYOUTS).map(([layout, l]) => (
+                <optgroup key={layout} label={l.label}>
+                  {PRESETS.filter((p) => p.template === layout).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              {inv.style && !presetById(inv.style.preset) && <option value={inv.style.preset}>Custom</option>}
+            </select>
           </section>
 
           <section className="p-6">

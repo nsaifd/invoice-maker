@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { CheckCircle2, FileSignature, FileText, Menu, Package, Repeat, Search, Settings, Users, X, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, FileSignature, FileText, Menu, Package, Palette, Repeat, Search, Settings, Users, X, type LucideIcon } from 'lucide-react'
 import { runRecurring } from '../lib/recurring'
 import { useSettings } from '../db'
 import { initials } from './ui'
@@ -11,6 +11,7 @@ const menu: Array<{ to: string; label: string; icon: LucideIcon; end?: boolean }
   { to: '/recurring', label: 'Recurring', icon: Repeat },
   { to: '/clients', label: 'Clients', icon: Users },
   { to: '/products', label: 'Products', icon: Package },
+  { to: '/templates', label: 'Templates', icon: Palette },
 ]
 
 export function Layout() {

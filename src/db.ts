@@ -3,8 +3,60 @@ import { useLiveQuery } from 'dexie-react-hooks'
 
 export type Currency = 'BDT' | 'USD' | 'EUR' | 'GBP' | 'INR'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid'
-export type TemplateId = 'minimal' | 'classic' | 'bold'
-export type FontId = 'jakarta' | 'inter' | 'lora'
+export type TemplateId = 'minimal' | 'classic' | 'bold' | 'sidebar' | 'split' | 'elegant' | 'cards' | 'receipt' | 'corporate' | 'gradient'
+export type FontId =
+  | 'jakarta'
+  | 'inter'
+  | 'poppins'
+  | 'manrope'
+  | 'dmsans'
+  | 'outfit'
+  | 'spacegrotesk'
+  | 'plex'
+  | 'worksans'
+  | 'lora'
+  | 'playfair'
+  | 'merriweather'
+  | 'libre'
+  | 'mono'
+  | 'hind'
+  | 'notobn'
+
+/** How a document looks. Lives on Settings (the default) and optionally on an invoice (an override). */
+export interface DocStyle {
+  /** Id of the preset this style started from, or 'custom'. */
+  preset: string
+  template: TemplateId
+  accentColor: string
+  accent2: string
+  font: FontId
+  textSize: 'sm' | 'md' | 'lg'
+  radius: 'none' | 'sm' | 'lg'
+  tableStyle: 'plain' | 'lines' | 'striped' | 'grid'
+  docTitle: string
+  showTaxColumn: boolean
+  amountInWords: boolean
+  showPayment: boolean
+  showSignature: boolean
+  footerText: string
+}
+
+export const STYLE_KEYS: Array<keyof DocStyle> = [
+  'preset',
+  'template',
+  'accentColor',
+  'accent2',
+  'font',
+  'textSize',
+  'radius',
+  'tableStyle',
+  'docTitle',
+  'showTaxColumn',
+  'amountInWords',
+  'showPayment',
+  'showSignature',
+  'footerText',
+]
 
 export interface PaymentDetails {
   bankName: string
@@ -19,7 +71,7 @@ export interface PaymentDetails {
   other: string
 }
 
-export interface Settings {
+export interface Settings extends DocStyle {
   id: 'default'
   businessName: string
   email: string
@@ -35,9 +87,6 @@ export interface Settings {
   invoicePrefix: string
   nextNumber: number
   dueDays: number
-  accentColor: string
-  template: TemplateId
-  font: FontId
   proposalPrefix: string
   nextProposalNumber: number
   proposalValidDays: number
@@ -93,6 +142,8 @@ export interface Invoice {
   terms: string
   paidAt?: string
   reminders?: Array<{ at: number; channel: 'email' | 'whatsapp' }>
+  /** Per-invoice design; falls back to the default style in Settings. */
+  style?: DocStyle
   recurringId?: number
   share?: ShareRef
   createdAt: number
@@ -202,9 +253,20 @@ export const defaultSettings: Settings = {
   invoicePrefix: 'INV-',
   nextNumber: 1,
   dueDays: 14,
-  accentColor: '#2563eb',
+  preset: 'minimal-ink',
   template: 'minimal',
+  accentColor: '#2563eb',
+  accent2: '#93c5fd',
   font: 'jakarta',
+  textSize: 'md',
+  radius: 'sm',
+  tableStyle: 'lines',
+  docTitle: 'Invoice',
+  showTaxColumn: true,
+  amountInWords: false,
+  showPayment: true,
+  showSignature: true,
+  footerText: '',
   proposalPrefix: 'PRO-',
   nextProposalNumber: 1,
   proposalValidDays: 30,
@@ -232,6 +294,15 @@ export async function getSettings(): Promise<Settings> {
 /** Returns undefined only while loading. */
 export function useSettings(): Settings | undefined {
   return useLiveQuery(getSettings, [])
+}
+
+export function styleOf(s: Settings): DocStyle {
+  return Object.fromEntries(STYLE_KEYS.map((k) => [k, s[k]])) as unknown as DocStyle
+}
+
+/** Settings with an invoice's own design applied on top. */
+export function withStyle(s: Settings, style?: DocStyle): Settings {
+  return style ? { ...s, ...style } : s
 }
 
 export function formatInvoiceNumber(s: Pick<Settings, 'invoicePrefix' | 'nextNumber'>): string {

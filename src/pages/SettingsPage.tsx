@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { db, defaultSettings, useSettings, type Currency, type FontId, type Invoice, type PaymentDetails, type Settings, type TemplateId } from '../db'
-import { CURRENCIES, addDays, todayISO, uid } from '../lib/invoice'
-import { InvoicePreview, TEMPLATES } from '../components/InvoicePreview'
-import { FONTS, ScaledFrame } from '../components/doc'
+import { Link } from 'react-router-dom'
+import { Palette } from 'lucide-react'
+import { db, defaultSettings, useSettings, type Currency, type PaymentDetails, type Settings } from '../db'
+import { CURRENCIES } from '../lib/invoice'
+import { FONTS } from '../lib/fonts'
+import { LAYOUTS, PRESETS, presetById } from '../lib/presets'
+import { sampleInvoice } from '../lib/sample'
+import { InvoicePreview } from '../components/InvoicePreview'
+import { FitToWidth } from '../components/doc'
 import { Button, Card, Field, PageHeader, inputCls } from '../components/ui'
 
 export default function SettingsPage() {
@@ -210,50 +215,22 @@ export default function SettingsPage() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <h2 className="mb-1 font-semibold">Design</h2>
-          <p className="mb-5 text-sm text-zinc-500">Choose how your invoices and proposals look. Changes preview instantly.</p>
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-            <div className="space-y-5">
-              <div>
-                <div className="mb-2 text-sm font-medium text-zinc-700">Invoice template</div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {(Object.entries(TEMPLATES) as Array<[TemplateId, (typeof TEMPLATES)[TemplateId]]>).map(([key, t]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => set({ template: key })}
-                      className={`rounded-xl border-2 p-3 text-left transition ${s.template === key ? 'border-blue-600 bg-blue-50/40' : 'border-zinc-200 hover:border-zinc-300'}`}
-                    >
-                      <TemplateThumb id={key} accent={s.accentColor} />
-                      <div className="mt-2 text-sm font-semibold text-zinc-900">{t.label}</div>
-                      <div className="text-xs text-zinc-500">{t.description}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Font">
-                  <select className={inputCls} value={s.font} onChange={(e) => set({ font: e.target.value as FontId })}>
-                    {Object.entries(FONTS).map(([k, f]) => (
-                      <option key={k} value={k}>
-                        {f.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Brand color">
-                  <div className="flex items-center gap-2">
-                    <input type="color" className="h-10 w-12 cursor-pointer rounded-lg border border-zinc-200" value={s.accentColor} onChange={(e) => set({ accentColor: e.target.value })} />
-                    {['#2563eb', '#0f766e', '#7c3aed', '#e11d48', '#ea580c', '#18181b'].map((c) => (
-                      <button key={c} type="button" aria-label={`Use ${c}`} onClick={() => set({ accentColor: c })} className="h-6 w-6 rounded-full ring-offset-2 hover:ring-2 hover:ring-zinc-300" style={{ background: c }} />
-                    ))}
-                  </div>
-                </Field>
-              </div>
+          <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_200px]">
+            <div>
+              <h2 className="mb-1 font-semibold">Design & templates</h2>
+              <p className="text-sm text-zinc-500">
+                Current design: <b className="text-zinc-800">{presetById(s.preset)?.name ?? 'Custom'}</b> · {LAYOUTS[s.template].label} layout · {FONTS[s.font].label}
+              </p>
+              <p className="mt-1 text-sm text-zinc-500">Choose from {PRESETS.length} designs, change colors, fonts, table style, title, amount in words and more.</p>
+              <Link to="/templates" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                <Palette className="h-4 w-4" /> Open templates
+              </Link>
             </div>
-            <ScaledFrame>
-              <InvoicePreview invoice={sampleInvoice(s)} settings={s} />
-            </ScaledFrame>
+            <Link to="/templates" className="block overflow-hidden rounded-xl border border-zinc-200 shadow-sm">
+              <FitToWidth>
+                <InvoicePreview invoice={sampleInvoice(s)} settings={s} />
+              </FitToWidth>
+            </Link>
           </div>
         </Card>
 
@@ -311,49 +288,4 @@ function resizeImage(file: File, max: number): Promise<string> {
     img.onerror = () => reject(new Error('Could not read image'))
     img.src = url
   })
-}
-
-function sampleInvoice(s: Settings): Invoice {
-  const issueDate = todayISO()
-  return {
-    number: `${s.invoicePrefix}0042`,
-    status: 'sent',
-    client: { name: 'Rahim Ahmed', company: 'Rahim Traders Ltd.', email: 'rahim@example.com', phone: '', address: 'Gulshan, Dhaka' },
-    issueDate,
-    dueDate: addDays(issueDate, s.dueDays),
-    currency: s.currency,
-    items: [
-      { id: uid(), description: 'Website design', qty: 1, rate: 25000, taxRate: s.taxRate },
-      { id: uid(), description: 'Hosting (1 year)', qty: 1, rate: 4500, taxRate: s.taxRate },
-    ],
-    discountType: 'percent',
-    discountValue: 0,
-    notes: s.notes,
-    terms: s.terms,
-    createdAt: 0,
-    updatedAt: 0,
-  }
-}
-
-function TemplateThumb({ id, accent }: { id: TemplateId; accent: string }) {
-  return (
-    <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-zinc-200 bg-white p-2">
-      {id === 'bold' && <div className="absolute inset-x-0 top-0 h-6" style={{ background: accent }} />}
-      {id === 'classic' && <div className="absolute inset-x-0 top-0 h-1" style={{ background: accent }} />}
-      <div className="relative mt-1 flex justify-between">
-        <div className={`h-2 w-10 rounded ${id === 'bold' ? 'bg-white/80' : 'bg-zinc-800'}`} style={id === 'classic' ? { background: accent } : undefined} />
-        <div className={`h-3 w-3 rounded-full ${id === 'bold' ? 'bg-white/70' : ''}`} style={id !== 'bold' ? { background: accent } : undefined} />
-      </div>
-      <div className={`mt-${id === 'bold' ? '4' : '3'} space-y-1`}>
-        <div className="h-1 w-14 rounded bg-zinc-200" />
-        <div className="h-1 w-10 rounded bg-zinc-200" />
-      </div>
-      <div className="mt-2 h-1.5 rounded" style={{ background: id === 'minimal' ? '#f4f4f5' : id === 'classic' ? accent : `${accent}30` }} />
-      <div className="mt-1 space-y-1">
-        <div className="h-1 rounded bg-zinc-100" />
-        <div className="h-1 rounded bg-zinc-100" />
-      </div>
-      <div className="ml-auto mt-1.5 h-2 w-12 rounded" style={{ background: id === 'minimal' ? '#f4f4f5' : `${accent}40` }} />
-    </div>
-  )
 }
