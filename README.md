@@ -27,9 +27,15 @@ Data is stored in the browser (IndexedDB). Hosted free on Cloudflare Pages.
 - E-signature (draw or type) with audit trail: name, email, time, IP address, browser
 - View tracking: number of opens, devices, last opened, time spent on each section
 
-**Data**
-- Your business data stays in the browser (IndexedDB); export/import JSON backups in Settings
-- Only documents you choose to share are stored on the server (Cloudflare D1)
+**Accounts & sync**
+- Optional free account (email + password). Data is saved locally first and synced to Cloudflare D1,
+  so the app works offline and on any number of devices. Per-record last-edit-wins conflict handling.
+- The password never leaves the browser: it is stretched with PBKDF2 (310k iterations) client-side and
+  hashed again with a per-user salt on the server. Sessions are HttpOnly cookies; writes need an
+  `x-involet` header (CSRF protection); sign-in and recovery are rate-limited.
+- A recovery code shown at sign-up resets a forgotten password (no email service needed).
+- Data created before signing in is uploaded on first sign-in. Signing out removes this device's copy.
+- Backups (JSON export/import) still work, including files from older versions.
 
 ## Run locally
 ```bash

@@ -18,7 +18,7 @@ const SWATCHES = ['#18181b', '#2563eb', '#4338ca', '#7c3aed', '#be185d', '#e11d4
 
 function InvoiceDesigns({ settings }: { settings: Settings }) {
   const customs = useLiveQuery(() => db.templates.where('kind').equals('invoice').toArray(), []) ?? []
-  const latest = useLiveQuery(() => db.invoices.orderBy(':id').last(), [])
+  const latest = useLiveQuery(() => db.invoices.orderBy('createdAt').last(), [])
   const [draft, setDraft] = useState<DocStyle | null>(null)
   const [filter, setFilter] = useState<'all' | BuiltInLayout>('all')
   const [flash, setFlash] = useState('')
@@ -415,7 +415,7 @@ const ProposalThumb = memo(function ProposalThumb({ theme, settings, proposal, s
 })
 
 function ProposalThemes({ settings }: { settings: Settings }) {
-  const latest = useLiveQuery(() => db.proposals.orderBy(':id').last().then((x) => x ?? null), [])
+  const latest = useLiveQuery(() => db.proposals.orderBy('createdAt').last().then((x) => x ?? null), [])
   const customs = useLiveQuery(() => db.templates.where('kind').equals('proposal').toArray(), []) ?? []
   const [draft, setDraft] = useState<ProposalTheme>(settings.proposalTheme)
   const [flash, setFlash] = useState('')
@@ -522,7 +522,7 @@ function ProposalThemes({ settings }: { settings: Settings }) {
 // ---------- my uploads ----------
 
 function MyDesigns({ settings }: { settings: Settings }) {
-  const templates = useLiveQuery(() => db.templates.orderBy(':id').reverse().toArray(), [])
+  const templates = useLiveQuery(() => db.templates.orderBy('createdAt').reverse().toArray(), [])
   if (!templates) return null
   const isDefault = (t: CustomTemplate) =>
     t.kind === 'invoice' ? settings.template === 'custom' && settings.customTemplateId === t.id : settings.proposalTheme.customTemplateId === t.id

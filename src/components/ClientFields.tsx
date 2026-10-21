@@ -33,9 +33,9 @@ export function ClientPicker({
   onSelect,
 }: {
   clients: Client[]
-  clientId?: number
+  clientId?: string
   client: ClientInfo
-  onSelect: (clientId: number | undefined, client: ClientInfo) => void
+  onSelect: (clientId: string | undefined, client: ClientInfo) => void
 }) {
   if (!clients.length) return null
   return (
@@ -51,7 +51,7 @@ export function ClientPicker({
         className="absolute inset-0 cursor-pointer opacity-0"
         value={clientId ?? ''}
         onChange={(e) => {
-          const c = clients.find((x) => x.id === Number(e.target.value))
+          const c = clients.find((x) => x.id === e.target.value)
           if (c) onSelect(c.id, { name: c.name, company: c.company, email: c.email, phone: c.phone, address: c.address })
           else onSelect(undefined, { ...emptyClient })
         }}

@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Palette } from 'lucide-react'
-import { db, defaultSettings, useSettings, type Currency, type PaymentDetails, type Settings } from '../db'
+import { SYNC_TABLES, db, defaultSettings, useSettings, type Currency, type PaymentDetails, type Settings } from '../db'
 import { CURRENCIES } from '../lib/invoice'
+import { remapLegacy, writeAll } from '../lib/migrate'
 import { FONTS } from '../lib/fonts'
 import { PRESETS, layoutLabel, presetById } from '../lib/presets'
 import { sampleInvoice } from '../lib/sample'
 import { InvoicePreview } from '../components/InvoicePreview'
 import { FitToWidth } from '../components/doc'
+import { AccountSettings } from '../components/AccountSettings'
 import { Button, Card, Field, PageHeader, inputCls } from '../components/ui'
 
 export default function SettingsPage() {
@@ -50,17 +52,8 @@ export default function SettingsPage() {
   }
 
   async function exportData() {
-    const data = {
-      app: 'involet',
-      version: 2,
-      exportedAt: new Date().toISOString(),
-      settings: await db.settings.toArray(),
-      clients: await db.clients.toArray(),
-      products: await db.products.toArray(),
-      invoices: await db.invoices.toArray(),
-      proposals: await db.proposals.toArray(),
-      recurring: await db.recurring.toArray(),
-    }
+    const data: Record<string, unknown> = { app: 'involet', version: 3, exportedAt: new Date().toISOString() }
+    for (const t of SYNC_TABLES) data[t] = (await db.table(t).toArray()).map(({ _dirty: _d, _ts: _t, ...row }) => row)
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = Object.assign(document.createElement('a'), { href: url, download: `involet-backup-${new Date().toISOString().slice(0, 10)}.json` })
     a.click()
@@ -74,16 +67,17 @@ export default function SettingsPage() {
       // Backups made before the rename say 'invoicekit'.
       if (data.app !== 'involet' && data.app !== 'invoicekit') throw new Error('Not an Involet backup file.')
       if (!confirm('This replaces ALL current data with the backup. Continue?')) return
-      const tables = [db.settings, db.clients, db.products, db.invoices, db.proposals, db.recurring]
-      await db.transaction('rw', tables, async () => {
-        await Promise.all(tables.map((t) => t.clear()))
-        await db.settings.bulkPut(data.settings ?? [])
-        await db.clients.bulkPut(data.clients ?? [])
-        await db.products.bulkPut(data.products ?? [])
-        await db.invoices.bulkPut(data.invoices ?? [])
-        await db.proposals.bulkPut(data.proposals ?? [])
-        await db.recurring.bulkPut(data.recurring ?? [])
+      const converted = remapLegacy(data)
+      await db.transaction('rw', [...SYNC_TABLES.map((t) => db.table(t)), db.outbox], async () => {
+        // clear() skips delete hooks, so record the deletions for your other devices first.
+        const now = Date.now()
+        for (const t of SYNC_TABLES) {
+          const keys = (await db.table(t).toCollection().primaryKeys()) as string[]
+          await db.outbox.bulkPut(keys.map((id) => ({ tbl: t, id, ts: now })))
+          await db.table(t).clear()
+        }
       })
+      await writeAll(converted)
       const restored = await db.settings.get('default')
       setS(restored ? { ...defaultSettings, ...restored } : defaultSettings)
       notify('Backup restored')
@@ -108,6 +102,8 @@ export default function SettingsPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <AccountSettings />
+
         <Card>
           <h2 className="mb-4 font-semibold">Business</h2>
           <div className="mb-4 flex items-center gap-4">

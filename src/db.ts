@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from 'dexie'
+import Dexie, { type EntityTable, type Transaction } from 'dexie'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 export type Currency = 'BDT' | 'USD' | 'EUR' | 'GBP' | 'INR'
@@ -40,7 +40,7 @@ export interface DocStyle {
   showSignature: boolean
   footerText: string
   /** Uploaded design used when template is 'custom'. */
-  customTemplateId?: number
+  customTemplateId?: string
 }
 
 export type CoverStyle = 'classic' | 'band' | 'fullbleed' | 'centered' | 'gradient' | 'minimal'
@@ -56,7 +56,7 @@ export interface ProposalTheme {
   font: FontId
   headingFont: FontId
   /** Uploaded design (cover + letterhead) used instead of the built-in cover. */
-  customTemplateId?: number
+  customTemplateId?: string
 }
 
 // ---------- uploaded designs ----------
@@ -112,7 +112,7 @@ export interface Zone {
 }
 
 export interface CustomTemplate {
-  id?: number
+  id?: string
   kind: 'invoice' | 'proposal'
   name: string
   /** Invoice: the page. Proposal: the cover page. JPEG/PNG data URL, A4 portrait. */
@@ -196,12 +196,12 @@ export interface ClientInfo {
 }
 
 export interface Client extends ClientInfo {
-  id?: number
+  id?: string
   createdAt: number
 }
 
 export interface Product {
-  id?: number
+  id?: string
   name: string
   description: string
   rate: number
@@ -218,10 +218,10 @@ export interface LineItem {
 }
 
 export interface Invoice {
-  id?: number
+  id?: string
   number: string
   status: InvoiceStatus
-  clientId?: number
+  clientId?: string
   // Snapshot of the client at the time of invoicing, so later client edits don't change old invoices.
   client: ClientInfo
   issueDate: string
@@ -236,7 +236,7 @@ export interface Invoice {
   reminders?: Array<{ at: number; channel: 'email' | 'whatsapp' }>
   /** Per-invoice design; falls back to the default style in Settings. */
   style?: DocStyle
-  recurringId?: number
+  recurringId?: string
   share?: ShareRef
   createdAt: number
   updatedAt: number
@@ -271,11 +271,11 @@ export type ProposalBlock =
 export type BlockType = ProposalBlock['type']
 
 export interface Proposal {
-  id?: number
+  id?: string
   number: string
   title: string
   status: ProposalStatus
-  clientId?: number
+  clientId?: string
   client: ClientInfo
   date: string
   validUntil: string
@@ -286,7 +286,7 @@ export interface Proposal {
   share?: ShareRef
   acceptance?: Acceptance
   declined?: { name: string; reason: string; at: string }
-  invoiceId?: number
+  invoiceId?: string
   createdAt: number
   updatedAt: number
 }
@@ -294,8 +294,8 @@ export interface Proposal {
 export type Frequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 
 export interface RecurringRule {
-  id?: number
-  sourceInvoiceId?: number
+  id?: string
+  sourceInvoiceId?: string
   // Copy of the invoice fields each generated invoice starts from.
   template: Pick<Invoice, 'clientId' | 'client' | 'currency' | 'items' | 'discountType' | 'discountValue' | 'notes' | 'terms'>
   frequency: Frequency
@@ -306,34 +306,94 @@ export interface RecurringRule {
   createdAt: number
 }
 
+/** Tables that are synced to the user's account. */
+export const SYNC_TABLES = ['settings', 'clients', 'products', 'invoices', 'proposals', 'recurring', 'templates'] as const
+export type SyncTable = (typeof SYNC_TABLES)[number]
+
+/** Sync bookkeeping stored on every synced record. */
+export interface SyncMeta {
+  /** Last local change time (ms). */
+  _ts?: number
+  /** 1 while the change hasn't been uploaded yet. */
+  _dirty?: 0 | 1
+}
+
+/** A deletion waiting to be uploaded. */
+export interface Tombstone {
+  tbl: SyncTable
+  id: string
+  ts: number
+}
+
 class InvoiceDB extends Dexie {
-  settings!: EntityTable<Settings, 'id'>
-  clients!: EntityTable<Client, 'id'>
-  products!: EntityTable<Product, 'id'>
-  invoices!: EntityTable<Invoice, 'id'>
-  proposals!: EntityTable<Proposal, 'id'>
-  recurring!: EntityTable<RecurringRule, 'id'>
-  templates!: EntityTable<CustomTemplate, 'id'>
+  settings!: EntityTable<Settings & SyncMeta, 'id'>
+  clients!: EntityTable<Client & SyncMeta, 'id'>
+  products!: EntityTable<Product & SyncMeta, 'id'>
+  invoices!: EntityTable<Invoice & SyncMeta, 'id'>
+  proposals!: EntityTable<Proposal & SyncMeta, 'id'>
+  recurring!: EntityTable<RecurringRule & SyncMeta, 'id'>
+  templates!: EntityTable<CustomTemplate & SyncMeta, 'id'>
+  outbox!: Dexie.Table<Tombstone, [string, string]>
 
   constructor() {
-    super('invoicekit')
+    // A new database: records use random string ids so several devices can create them without clashing.
+    super('involet')
     this.version(1).stores({
-      settings: 'id',
-      clients: '++id, name',
-      products: '++id, name',
-      invoices: '++id, number, status, clientId, issueDate, dueDate',
-    })
-    this.version(2).stores({
-      proposals: '++id, number, status, clientId, date',
-      recurring: '++id, nextDate, active',
-    })
-    this.version(3).stores({
-      templates: '++id, kind, name',
+      settings: 'id, _dirty',
+      clients: 'id, name, createdAt, _dirty',
+      products: 'id, name, createdAt, _dirty',
+      invoices: 'id, number, status, clientId, issueDate, dueDate, createdAt, _dirty',
+      proposals: 'id, number, status, clientId, date, createdAt, _dirty',
+      recurring: 'id, nextDate, active, createdAt, _dirty',
+      templates: 'id, kind, name, createdAt, _dirty',
+      outbox: '[tbl+id]',
     })
   }
 }
 
 export const db = new InvoiceDB()
+
+const ID_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
+export function newId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (b) => ID_ALPHABET[b % 36]).join('')
+}
+
+/** Writes inside a transaction marked this way come from the server and must not be re-uploaded. */
+export function markRemote(tx: Transaction | null) {
+  if (tx) (tx as unknown as { remote?: boolean }).remote = true
+}
+const isRemote = (tx: unknown) => !!(tx as { remote?: boolean } | null)?.remote
+
+let onLocalChange: () => void = () => {}
+/** The sync engine registers here to hear about local edits. */
+export function setLocalChangeListener(fn: () => void) {
+  onLocalChange = fn
+}
+
+for (const name of SYNC_TABLES) {
+  const table = db.table(name)
+  table.hook('creating', function (_pk, obj: { id?: string } & SyncMeta, tx) {
+    if (!obj.id) obj.id = newId()
+    if (!isRemote(tx)) {
+      obj._ts = Date.now()
+      obj._dirty = 1
+      tx.on('complete', () => onLocalChange())
+    }
+    return obj.id
+  })
+  table.hook('updating', function (_mods, _pk, _obj, tx) {
+    if (isRemote(tx)) return
+    tx.on('complete', () => onLocalChange())
+    return { _ts: Date.now(), _dirty: 1 }
+  })
+  table.hook('deleting', function (pk, _obj, tx) {
+    if (isRemote(tx)) return
+    tx.on('complete', () => {
+      db.outbox.put({ tbl: name, id: String(pk), ts: Date.now() }).then(() => onLocalChange())
+    })
+  })
+}
 
 export const emptyClient: ClientInfo = { name: '', company: '', email: '', phone: '', address: '' }
 

@@ -1,6 +1,8 @@
 // Share-link backend: stores published proposals/invoices in D1 so clients can view,
 // comment on and sign them at /p/:id. Everything else is served from static assets.
 
+import { ACCOUNT_SCHEMA, HttpError, handleAuth, handleSync } from './accounts'
+
 interface Env {
   DB: D1Database
   ASSETS: Fetcher
@@ -52,21 +54,13 @@ const SCHEMA = [
 
 let schemaReady: Promise<unknown> | null = null
 function ensureSchema(db: D1Database) {
-  schemaReady ??= db.batch(SCHEMA.map((sql) => db.prepare(sql))).catch((e) => {
+  schemaReady ??= db.batch([...SCHEMA, ...ACCOUNT_SCHEMA].map((sql) => db.prepare(sql))).catch((e) => {
     schemaReady = null
     throw e
   })
   return schemaReady
 }
 
-class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message)
-  }
-}
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
@@ -194,7 +188,7 @@ async function handleApi(req: Request, env: Env, path: string[]): Promise<Respon
     if ((count?.n ?? 0) >= MAX_EVENTS_PER_SHARE) return json({ ok: true })
     const visitor = str(body.visitor, 40)
     const stmts = (body.events ?? [])
-      .slice(0, 50)
+      .slice(0, 40) // stays under the 50 D1 queries a free-plan request may make
       .filter((e) => e.type === 'open' || e.type === 'section')
       .map((e) =>
         env.DB.prepare('INSERT INTO events (share_id, type, section, ms, visitor, ip, ua, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(
@@ -280,6 +274,12 @@ export default {
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req)
     const parts = url.pathname.split('/').filter(Boolean) // ['api', 'shares', ...]
     try {
+      if (parts[1] === 'auth' || parts[1] === 'sync') {
+        // Cookies are sent automatically, so writes must also carry a header other sites can't set.
+        if (req.method !== 'GET' && req.headers.get('x-involet') !== '1') throw new HttpError(403, 'Missing request header')
+        await ensureSchema(env.DB)
+        return parts[1] === 'auth' ? await handleAuth(req, env, parts[2] ?? '') : await handleSync(req, env)
+      }
       if (parts[1] !== 'shares') throw new HttpError(404, 'Not found')
       return await handleApi(req, env, parts.slice(2))
     } catch (e) {

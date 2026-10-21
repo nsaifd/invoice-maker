@@ -12,7 +12,7 @@ import { ActivityPanel, CommentsPanel, SharePanel, useActivity } from '../compon
 import { Button, Field, Modal, PageHeader, StatusBadge, inputCls } from '../components/ui'
 
 export default function InvoiceView() {
-  const id = Number(useParams().id)
+  const id = useParams().id ?? ''
   const navigate = useNavigate()
   const settings = useSettings()
   const inv = useLiveQuery(() => db.invoices.get(id).then((x) => x ?? null), [id])

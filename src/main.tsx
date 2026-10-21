@@ -16,34 +16,44 @@ import RecurringPage from './pages/RecurringPage'
 import PublicPage from './pages/PublicPage'
 import TemplatesPage from './pages/TemplatesPage'
 import TemplateDesigner from './pages/TemplateDesigner'
+import AuthPage from './pages/AuthPage'
+import { ready } from './lib/migrate'
+import { initSync } from './lib/sync'
 
 // Ask the browser not to evict our IndexedDB data under storage pressure.
 navigator.storage?.persist?.().catch(() => {})
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="p/:id" element={<PublicPage />} />
-        <Route element={<Layout />}>
-          <Route index element={<InvoicesPage />} />
-          <Route path="invoices/new" element={<InvoiceEditor />} />
-          <Route path="invoices/:id" element={<InvoiceView />} />
-          <Route path="invoices/:id/edit" element={<InvoiceEditor />} />
-          <Route path="proposals" element={<ProposalsPage />} />
-          <Route path="proposals/new" element={<ProposalEditor />} />
-          <Route path="proposals/:id" element={<ProposalView />} />
-          <Route path="proposals/:id/edit" element={<ProposalEditor />} />
-          <Route path="recurring" element={<RecurringPage />} />
-          <Route path="templates" element={<TemplatesPage />} />
-          <Route path="templates/design/new" element={<TemplateDesigner />} />
-          <Route path="templates/design/:id" element={<TemplateDesigner />} />
-          <Route path="clients" element={<ClientsPage />} />
-          <Route path="products" element={<ProductsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="*" element={<InvoicesPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  </StrictMode>,
-)
+// Move data from the old local database (if any) before the app reads it, then start syncing.
+ready.then(() => {
+  initSync()
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <BrowserRouter>
+        <Routes>
+          <Route path="p/:id" element={<PublicPage />} />
+          <Route path="login" element={<AuthPage mode="login" />} />
+          <Route path="signup" element={<AuthPage mode="signup" />} />
+          <Route path="recover" element={<AuthPage mode="recover" />} />
+          <Route element={<Layout />}>
+            <Route index element={<InvoicesPage />} />
+            <Route path="invoices/new" element={<InvoiceEditor />} />
+            <Route path="invoices/:id" element={<InvoiceView />} />
+            <Route path="invoices/:id/edit" element={<InvoiceEditor />} />
+            <Route path="proposals" element={<ProposalsPage />} />
+            <Route path="proposals/new" element={<ProposalEditor />} />
+            <Route path="proposals/:id" element={<ProposalView />} />
+            <Route path="proposals/:id/edit" element={<ProposalEditor />} />
+            <Route path="recurring" element={<RecurringPage />} />
+            <Route path="templates" element={<TemplatesPage />} />
+            <Route path="templates/design/new" element={<TemplateDesigner />} />
+            <Route path="templates/design/:id" element={<TemplateDesigner />} />
+            <Route path="clients" element={<ClientsPage />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="*" element={<InvoicesPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </StrictMode>,
+  )
+})

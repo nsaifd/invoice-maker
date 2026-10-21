@@ -143,7 +143,7 @@ export function ProductPicker({
       className={`${inputCls} w-auto py-2`}
       value=""
       onChange={(e) => {
-        const p = products.find((x) => x.id === Number(e.target.value))
+        const p = products.find((x) => x.id === e.target.value)
         if (!p) return
         const item = newLineItem(settings, { description: p.description ? `${p.name}\n${p.description}` : p.name, rate: p.rate })
         onAdd([...items.filter((i) => i.description.trim() || Number(i.rate)), item])

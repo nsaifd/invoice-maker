@@ -11,7 +11,7 @@ import { ActivityPanel, AuditTrail, CommentsPanel, SharePanel, useActivity } fro
 import { Button, PageHeader, StatusBadge } from '../components/ui'
 
 export default function ProposalView() {
-  const id = Number(useParams().id)
+  const id = useParams().id ?? ''
   const navigate = useNavigate()
   const settings = useSettings()
   const p = useLiveQuery(() => db.proposals.get(id).then((x) => x ?? null), [id])

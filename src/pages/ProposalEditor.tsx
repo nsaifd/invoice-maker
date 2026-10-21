@@ -39,7 +39,7 @@ export default function ProposalEditor() {
 
   useEffect(() => {
     if (!settings || doc) return
-    if (id) db.proposals.get(Number(id)).then((found) => (found ? setDoc(found) : navigate('/proposals', { replace: true })))
+    if (id) db.proposals.get(id).then((found) => (found ? setDoc(found) : navigate('/proposals', { replace: true })))
     else setDoc(newProposal(settings))
   }, [id, settings, doc, navigate])
 
@@ -177,7 +177,7 @@ export default function ProposalEditor() {
                 onChange={(e) => {
                   const v = e.target.value
                   if (!v) return set({ theme: undefined })
-                  if (v.startsWith('custom:')) return set({ theme: { ...settings.proposalTheme, preset: 'custom', customTemplateId: Number(v.slice(7)) } })
+                  if (v.startsWith('custom:')) return set({ theme: { ...settings.proposalTheme, preset: 'custom', customTemplateId: v.slice(7) } })
                   const t = themeById(v)
                   if (t) set({ theme: applyTheme(settings.proposalTheme, t) })
                 }}

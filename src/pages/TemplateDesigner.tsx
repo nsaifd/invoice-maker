@@ -50,15 +50,15 @@ export default function TemplateDesigner() {
   const navigate = useNavigate()
   const settings = useSettings()
   const kind = (params.get('kind') === 'proposal' ? 'proposal' : 'invoice') as CustomTemplate['kind']
-  const latestInvoice = useLiveQuery(() => db.invoices.orderBy(':id').last().then((x) => x ?? null), [])
-  const latestProposal = useLiveQuery(() => db.proposals.orderBy(':id').last().then((x) => x ?? null), [])
+  const latestInvoice = useLiveQuery(() => db.invoices.orderBy('createdAt').last().then((x) => x ?? null), [])
+  const latestProposal = useLiveQuery(() => db.proposals.orderBy('createdAt').last().then((x) => x ?? null), [])
   const [tpl, setTpl] = useState<CustomTemplate | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [savedJson, setSavedJson] = useState('')
 
   useEffect(() => {
     if (!id) return setLoaded(true)
-    db.templates.get(Number(id)).then((t) => {
+    db.templates.get(id).then((t) => {
       if (!t) return navigate('/templates?tab=mine', { replace: true })
       setTpl(t)
       setSavedJson(JSON.stringify(t))
@@ -242,7 +242,7 @@ function Designer({
   async function save(asDefault: boolean) {
     const record = { ...tpl, updatedAt: Date.now() }
     const newId = await db.transaction('rw', db.templates, db.settings, async () => {
-      const tid = (await db.templates.put(record)) as number
+      const tid = await db.templates.put(record)
       if (asDefault) {
         const s = await db.settings.get('default')
         if (s) {
@@ -331,7 +331,7 @@ function Designer({
             <FitToWidth>
               <div className="shadow-lg">
                 {isProposal ? (
-                  <ProposalDocument proposal={data.proposal!} settings={{ ...settings, proposalTheme: { ...settings.proposalTheme, customTemplateId: -1 } }} customTemplate={tpl} />
+                  <ProposalDocument proposal={data.proposal!} settings={{ ...settings, proposalTheme: { ...settings.proposalTheme, customTemplateId: 'preview' } }} customTemplate={tpl} />
                 ) : (
                   <PreviewInvoice tpl={tpl} data={data} />
                 )}

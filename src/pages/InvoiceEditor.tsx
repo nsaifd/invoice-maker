@@ -33,7 +33,7 @@ export default function InvoiceEditor() {
   useEffect(() => {
     if (!settings || inv) return
     if (id)
-      db.invoices.get(Number(id)).then((found) => {
+      db.invoices.get(id).then((found) => {
         if (!found) return navigate('/', { replace: true })
         setInv(found)
       })
@@ -163,7 +163,7 @@ export default function InvoiceEditor() {
               value={inv.style ? (inv.style.template === 'custom' ? `custom:${inv.style.customTemplateId}` : inv.style.preset) : ''}
               onChange={(e) => {
                 const v = e.target.value
-                if (v.startsWith('custom:')) return set({ style: { ...styleOf(settings), template: 'custom', preset: 'custom', customTemplateId: Number(v.slice(7)) } })
+                if (v.startsWith('custom:')) return set({ style: { ...styleOf(settings), template: 'custom', preset: 'custom', customTemplateId: v.slice(7) } })
                 const p = presetById(v)
                 set({ style: p ? applyPreset(styleOf(settings), p) : undefined })
               }}
