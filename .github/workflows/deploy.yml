@@ -1,0 +1,22 @@
+# Cloudflare's Git integration isn't picking up pushes for this repo, so GitHub
+# triggers the build itself via a Cloudflare deploy hook after every push to main.
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  trigger-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Cloudflare deploy hook
+        env:
+          HOOK_URL: ${{ secrets.CF_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "::error::Add the CF_DEPLOY_HOOK_URL repository secret (Cloudflare → Settings → Builds → Deploy Hooks)."
+            exit 1
+          fi
+          curl -fsS -X POST "$HOOK_URL"
