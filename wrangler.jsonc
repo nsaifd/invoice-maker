@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "invoice-maker",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    // Serve index.html for client-side routes like /invoices/1 so page refreshes work.
+    "not_found_handling": "single-page-application"
+  }
+}

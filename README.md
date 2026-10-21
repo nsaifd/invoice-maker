@@ -19,16 +19,17 @@ npm install
 npm run dev
 ```
 
-## Deploy to Cloudflare Pages (free)
-1. Push this repo to GitHub.
-2. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
-3. Select this repository, then set:
-   - Framework preset: **React (Vite)** (or None)
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-4. **Save and Deploy**. Every push to `main` redeploys automatically.
+## Deploy to Cloudflare (free)
+Live: https://invoice-maker.connect-saifd.workers.dev
 
-Optional: **Custom domains** → add e.g. `invoice.yourdomain.com`.
+The project is deployed as a Cloudflare Worker with static assets, configured in `wrangler.jsonc`
+(SPA fallback so routes like `/invoices/1` survive a refresh).
+
+- Cloudflare dashboard → **Workers & Pages** → **invoice-maker** is connected to this GitHub repo.
+- Build command: `npm run build` · Deploy command: `npx wrangler deploy`
+- Every push to `main` builds and deploys automatically.
+
+Optional: **Settings → Domains & Routes** → add a custom domain such as `invoice.yourdomain.com`.
 
 ## Important
 Data lives only in the browser where it was created. Use **Settings → Export backup** regularly.
