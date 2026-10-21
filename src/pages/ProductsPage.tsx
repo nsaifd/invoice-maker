@@ -1,0 +1,84 @@
+import { useLiveQuery } from 'dexie-react-hooks'
+import { useState } from 'react'
+import { db, useSettings, type Product } from '../db'
+import { formatMoney } from '../lib/invoice'
+import { Button, Card, Field, Modal, PageHeader, inputCls } from '../components/ui'
+
+const blank = (): Product => ({ name: '', description: '', rate: 0, unit: '', createdAt: Date.now() })
+
+export default function ProductsPage() {
+  const settings = useSettings()
+  const products = useLiveQuery(() => db.products.orderBy('name').toArray(), [])
+  const [editing, setEditing] = useState<Product | null>(null)
+
+  async function save() {
+    if (!editing) return
+    if (!editing.name.trim()) return alert('Please enter a name.')
+    await db.products.put(editing)
+    setEditing(null)
+  }
+
+  if (!settings) return null
+  const set = (patch: Partial<Product>) => setEditing((p) => p && { ...p, ...patch })
+
+  return (
+    <>
+      <PageHeader title="Products & services" actions={<Button onClick={() => setEditing(blank())}>+ Add item</Button>} />
+      <p className="-mt-3 mb-6 text-sm text-slate-500">Save the things you sell often, then add them to an invoice in one click.</p>
+      {products && products.length === 0 && <Card className="py-12 text-center text-slate-500">No saved products or services yet.</Card>}
+      {products && products.length > 0 && (
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Description</th>
+                <th className="px-4 py-3 text-right font-medium">Rate</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id} className="border-t border-slate-100">
+                  <td className="px-4 py-3 font-medium text-slate-900">{p.name}</td>
+                  <td className="px-4 py-3 text-slate-500">{p.description}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                    {formatMoney(Math.round(p.rate * 100), settings.currency)}
+                    {p.unit && <span className="text-slate-400"> / {p.unit}</span>}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <Button variant="ghost" onClick={() => setEditing(p)}>Edit</Button>
+                    <Button variant="ghost" className="hover:!text-red-600" onClick={() => confirm(`Delete ${p.name}?`) && db.products.delete(p.id!)}>Delete</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      <Modal open={!!editing} title={editing?.id ? 'Edit item' : 'New item'} onClose={() => setEditing(null)}>
+        {editing && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Name *" className="sm:col-span-2">
+              <input className={inputCls} value={editing.name} onChange={(e) => set({ name: e.target.value })} />
+            </Field>
+            <Field label="Description" className="sm:col-span-2">
+              <textarea rows={2} className={inputCls} value={editing.description} onChange={(e) => set({ description: e.target.value })} />
+            </Field>
+            <Field label={`Rate (${settings.currency})`}>
+              <input type="number" min={0} step="any" className={inputCls} value={editing.rate} onChange={(e) => set({ rate: Number(e.target.value) })} />
+            </Field>
+            <Field label="Unit (optional)">
+              <input className={inputCls} placeholder="hour, page, month…" value={editing.unit} onChange={(e) => set({ unit: e.target.value })} />
+            </Field>
+          </div>
+        )}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setEditing(null)}>Cancel</Button>
+          <Button onClick={save}>Save</Button>
+        </div>
+      </Modal>
+    </>
+  )
+}
