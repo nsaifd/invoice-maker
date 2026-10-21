@@ -51,7 +51,7 @@ export default function SettingsPage() {
 
   async function exportData() {
     const data = {
-      app: 'invoicekit',
+      app: 'involet',
       version: 2,
       exportedAt: new Date().toISOString(),
       settings: await db.settings.toArray(),
@@ -62,7 +62,7 @@ export default function SettingsPage() {
       recurring: await db.recurring.toArray(),
     }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
-    const a = Object.assign(document.createElement('a'), { href: url, download: `invoicekit-backup-${new Date().toISOString().slice(0, 10)}.json` })
+    const a = Object.assign(document.createElement('a'), { href: url, download: `involet-backup-${new Date().toISOString().slice(0, 10)}.json` })
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -71,7 +71,8 @@ export default function SettingsPage() {
     if (!file) return
     try {
       const data = JSON.parse(await file.text())
-      if (data.app !== 'invoicekit') throw new Error('Not an InvoiceKit backup file.')
+      // Backups made before the rename say 'invoicekit'.
+      if (data.app !== 'involet' && data.app !== 'invoicekit') throw new Error('Not an Involet backup file.')
       if (!confirm('This replaces ALL current data with the backup. Continue?')) return
       const tables = [db.settings, db.clients, db.products, db.invoices, db.proposals, db.recurring]
       await db.transaction('rw', tables, async () => {

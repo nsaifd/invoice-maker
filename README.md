@@ -1,4 +1,4 @@
-# InvoiceKit
+# Involet
 
 Invoice maker that runs entirely in the browser — no backend, no external APIs.
 Data is stored in the browser (IndexedDB). Hosted free on Cloudflare Pages.

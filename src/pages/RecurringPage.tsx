@@ -84,7 +84,7 @@ export default function RecurringPage() {
           </table>
         </div>
       )}
-      <p className="mt-4 text-xs text-zinc-500">New invoices are created as drafts when you open InvoiceKit on or after the scheduled date, so you can review them before sending.</p>
+      <p className="mt-4 text-xs text-zinc-500">New invoices are created as drafts when you open Involet on or after the scheduled date, so you can review them before sending.</p>
     </>
   )
 }

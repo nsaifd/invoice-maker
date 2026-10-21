@@ -201,7 +201,12 @@ function Shell({ settings, actions, children }: { settings?: Settings; actions?:
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-      <footer className="pb-8 text-center text-xs text-zinc-400">Sent with InvoiceKit</footer>
+      <footer className="flex items-center justify-center gap-1.5 pb-8 text-xs text-zinc-400">
+        Sent with
+        <a href="/" className="opacity-70 transition hover:opacity-100" aria-label="Involet">
+          <img src="/logo.svg" alt="Involet" className="h-4 w-auto" />
+        </a>
+      </footer>
     </div>
   )
 }

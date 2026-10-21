@@ -73,9 +73,8 @@ export function Layout() {
 
 function Brand() {
   return (
-    <Link to="/" className="flex items-center gap-2 text-lg font-bold tracking-tight text-zinc-900">
-      <img src="/favicon.svg" alt="" className="h-7 w-7" />
-      InvoiceKit
+    <Link to="/" className="flex items-center" aria-label="Involet home">
+      <img src="/logo.svg" alt="Involet" className="h-8 w-auto" />
     </Link>
   )
 }
