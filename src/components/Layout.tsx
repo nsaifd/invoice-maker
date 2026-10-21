@@ -5,7 +5,7 @@ import { runRecurring } from '../lib/recurring'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, useSettings } from '../db'
 import { timeAgo } from '../lib/share'
-import { useSyncStatus, type SyncStatus } from '../lib/sync'
+import { syncReady, useSyncStatus, type SyncStatus } from '../lib/sync'
 import { initials } from './ui'
 
 const menu: Array<{ to: string; label: string; icon: LucideIcon; end?: boolean }> = [
@@ -25,7 +25,8 @@ export function Layout() {
 
   // Create any recurring invoices that came due while the app was closed.
   useEffect(() => {
-    runRecurring()
+    syncReady
+      .then(runRecurring)
       .then((n) => {
         if (!n) return
         setToast(`${n} recurring invoice${n === 1 ? ' was' : 's were'} created as draft${n === 1 ? '' : 's'}.`)

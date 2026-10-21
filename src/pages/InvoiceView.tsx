@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BellRing, CheckCircle2, Copy, Download, Mail, MessageCircle, Pencil, Repeat, RotateCcw, Send, Trash2 } from 'lucide-react'
-import { db, formatInvoiceNumber, getSettings, useSettings, type Frequency, type Invoice } from '../db'
+import { db, getSettings, takeInvoiceNumber, useSettings, type Frequency, type Invoice } from '../db'
 import { addDays, calcTotals, displayStatus, formatDate, formatMoney, todayISO, uid } from '../lib/invoice'
 import { FREQUENCIES, nextOccurrence, openReminder, ruleFromInvoice } from '../lib/recurring'
 import { shareUrl, snapshot, timeAgo } from '../lib/share'
@@ -67,7 +67,7 @@ export default function InvoiceView() {
     const copy: Invoice = {
       ...inv!,
       id: undefined,
-      number: formatInvoiceNumber(s),
+      number: '',
       status: 'draft',
       paidAt: undefined,
       share: undefined,
@@ -80,8 +80,7 @@ export default function InvoiceView() {
       updatedAt: Date.now(),
     }
     const newId = await db.transaction('rw', db.invoices, db.settings, async () => {
-      await db.settings.put({ ...s, nextNumber: s.nextNumber + 1 })
-      return db.invoices.add(copy)
+      return db.invoices.add({ ...copy, number: await takeInvoiceNumber() })
     })
     navigate(`/invoices/${newId}/edit`)
   }

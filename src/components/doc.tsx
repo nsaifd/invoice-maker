@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { createPortal } from 'react-dom'
 import type { Acceptance, Currency, DocStyle, LineItem, Settings } from '../db'
 import { fontStack, loadFont } from '../lib/fonts'
-import { calcTotals, formatMoney } from '../lib/invoice'
+import { calcTotals, formatMoney, toCents } from '../lib/invoice'
 import { amountInWords } from '../lib/words'
 
 // Building blocks shared by the invoice templates and the proposal document.
@@ -118,7 +118,7 @@ export function ItemsTable({
               {item.description || <span className="text-zinc-300">Item name</span>}
             </td>
             <td className={`px-3 py-2.5 text-center ${cell}`}>{item.qty}</td>
-            <td className={`px-3 py-2.5 text-right ${cell}`}>{money(Math.round((Number(item.rate) || 0) * 100))}</td>
+            <td className={`px-3 py-2.5 text-right ${cell}`}>{money(toCents(item.rate))}</td>
             {look.showTax && <td className={`px-3 py-2.5 text-center ${cell}`}>{Number(item.taxRate) || 0}%</td>}
             <td className={`px-3 py-2.5 text-right ${cell}`} style={look.table === 'striped' ? { borderTopRightRadius: r, borderBottomRightRadius: r } : undefined}>
               {money(lines[i])}

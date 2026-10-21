@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable, type Transaction } from 'dexie'
+import Dexie, { type EntityTable, type Table, type Transaction } from 'dexie'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 export type Currency = 'BDT' | 'USD' | 'EUR' | 'GBP' | 'INR'
@@ -300,6 +300,8 @@ export interface RecurringRule {
   template: Pick<Invoice, 'clientId' | 'client' | 'currency' | 'items' | 'discountType' | 'discountValue' | 'notes' | 'terms'>
   frequency: Frequency
   nextDate: string
+  /** Day of month the schedule started on, so monthly dates don't drift after short months. */
+  anchorDay?: number
   endDate?: string
   active: boolean
   generatedCount: number
@@ -487,9 +489,56 @@ export function formatProposalNumber(s: Pick<Settings, 'proposalPrefix' | 'nextP
   return `${s.proposalPrefix}${String(s.nextProposalNumber).padStart(4, '0')}`
 }
 
-/** Allocates the next invoice number inside the caller's transaction (which must include db.settings). */
-export async function takeInvoiceNumber(): Promise<string> {
+type NumberKind = 'invoice' | 'proposal'
+const NUMBERING = {
+  invoice: { table: () => db.invoices, prefix: 'invoicePrefix', counter: 'nextNumber' },
+  proposal: { table: () => db.proposals, prefix: 'proposalPrefix', counter: 'nextProposalNumber' },
+} as const
+
+function formatNumber(prefix: string, n: number) {
+  return `${prefix}${String(n).padStart(4, '0')}`
+}
+
+/**
+ * The counter's next number, skipping any already used — e.g. one typed by hand or synced
+ * from another device — so two documents never get the same number.
+ */
+async function nextFree(kind: NumberKind, s: Settings): Promise<{ number: string; n: number }> {
+  const { table, prefix, counter } = NUMBERING[kind]
+  let n = Math.max(1, Math.floor(Number(s[counter]) || 1))
+  for (let i = 0; i < 10_000; i++, n++) {
+    const number = formatNumber(s[prefix], n)
+    if (!(await (table() as unknown as Table).where('number').equals(number).count())) return { number, n }
+  }
+  return { number: formatNumber(s[prefix], n), n }
+}
+
+/** A suggested number for a new document; nothing is reserved until it is saved. */
+export async function suggestNumber(kind: NumberKind): Promise<string> {
+  return (await nextFree(kind, await getSettings())).number
+}
+
+/** Allocates the next free number inside the caller's transaction (which must include db.settings and the documents' table). */
+export async function takeNumber(kind: NumberKind): Promise<string> {
   const s = await getSettings()
-  await db.settings.put({ ...s, nextNumber: s.nextNumber + 1 })
-  return formatInvoiceNumber(s)
+  const { number, n } = await nextFree(kind, s)
+  await db.settings.put({ ...s, [NUMBERING[kind].counter]: n + 1 })
+  return number
+}
+
+export const takeInvoiceNumber = () => takeNumber('invoice')
+
+/**
+ * After a document is saved with `number`: if it uses the current prefix and a number at or past
+ * the counter (the suggested one, or one typed by hand), move the counter past it.
+ */
+export async function bumpCounter(kind: NumberKind, number: string): Promise<void> {
+  const s = await getSettings()
+  const { prefix, counter } = NUMBERING[kind]
+  const p = s[prefix]
+  if (!number.startsWith(p)) return
+  const rest = number.slice(p.length)
+  if (!/^\d{1,9}$/.test(rest)) return
+  const n = Number(rest)
+  if (n >= s[counter]) await db.settings.put({ ...s, [counter]: n + 1 })
 }

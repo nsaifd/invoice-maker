@@ -109,13 +109,28 @@ export function invoiceFromProposal(p: Proposal): Pick<Invoice, 'client' | 'clie
   const items = pricing.flatMap((b) => b.items.map((i) => ({ ...i, id: uid() })))
   let discountType: Invoice['discountType'] = 'percent'
   let discountValue = 0
-  if (pricing.length === 1) {
-    discountType = pricing[0].discountType
-    discountValue = pricing[0].discountValue
-  } else if (pricing.length > 1) {
-    // Several pricing tables: carry their combined discount over as one fixed amount.
-    discountType = 'fixed'
-    discountValue = pricing.reduce((sum, b) => sum + calcTotals(b).discount, 0) / 100
+  const discounted = pricing.filter((b) => calcTotals(b).discount)
+  const first = pricing[0]
+  if (first && pricing.every((b) => b.discountType === first.discountType && b.discountValue === first.discountValue) && (pricing.length === 1 || first.discountType === 'percent')) {
+    // One table, or every table has the same % off: the invoice's own discount gives the same total.
+    discountType = first.discountType
+    discountValue = first.discountValue
+  } else {
+    // Tables with different discounts can't share one invoice discount without changing the tax
+    // (each table's discount reduces only its own lines' tax). Each discount becomes a minus line
+    // per tax rate instead, so the invoice adds up exactly like the proposal.
+    for (const b of discounted) {
+      const { lines, subtotal, discount } = calcTotals(b)
+      const byTax = new Map<number, number>()
+      b.items.forEach((it, idx) => byTax.set(Number(it.taxRate) || 0, (byTax.get(Number(it.taxRate) || 0) ?? 0) + lines[idx]))
+      let left = discount
+      const rates = [...byTax].filter(([, base]) => base)
+      rates.forEach(([taxRate, base], k) => {
+        const cents = k === rates.length - 1 ? left : Math.round((discount * base) / subtotal)
+        left -= cents
+        if (cents) items.push({ id: uid(), description: `Discount${b.heading ? ` — ${b.heading}` : ''}`, qty: 1, rate: -cents / 100, taxRate })
+      })
+    }
   }
   return { client: { ...p.client }, clientId: p.clientId, currency: p.currency, items, discountType, discountValue }
 }

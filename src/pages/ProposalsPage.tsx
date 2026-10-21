@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CheckCircle2, Eye, FileSignature, Plus, Search, Send, type LucideIcon } from 'lucide-react'
-import { db, useSettings } from '../db'
+import { db, useSettings, type Currency } from '../db'
 import { formatDate, formatMoney, todayISO } from '../lib/invoice'
 import { proposalDisplayStatus, proposalTotal, type ProposalDisplayStatus } from '../lib/proposal'
 import { PageHeader, StatusBadge, initials, inputCls } from '../components/ui'
@@ -19,13 +19,18 @@ export default function ProposalsPage() {
 
   if (!settings || !proposals) return null
   const cur = settings.currency
-  const inCur = rows.filter((r) => r.p.currency === cur)
-  const open = inCur.filter((r) => r.status === 'sent' || r.status === 'viewed')
+  const open = rows.filter((r) => r.status === 'sent' || r.status === 'viewed')
   const accepted = rows.filter((r) => r.status === 'accepted')
   const decided = rows.filter((r) => r.status === 'accepted' || r.status === 'declined').length
   const month = todayISO().slice(0, 7)
-  const acceptedMonth = inCur.filter((r) => r.status === 'accepted' && (r.p.acceptance?.signedAt ?? new Date(r.p.updatedAt).toISOString()).startsWith(month))
-  const sum = (xs: typeof rows) => xs.reduce((a, r) => a + r.total, 0)
+  const acceptedMonth = rows.filter((r) => r.status === 'accepted' && (r.p.acceptance?.signedAt ?? new Date(r.p.updatedAt).toISOString()).startsWith(month))
+  const sum = (xs: typeof rows) => xs.filter((r) => r.p.currency === cur).reduce((a, r) => a + r.total, 0)
+  // Amounts in other currencies can't be added together, so they're listed separately.
+  const others = (xs: typeof rows) => {
+    const by = new Map<Currency, number>()
+    for (const r of xs) if (r.p.currency !== cur) by.set(r.p.currency, (by.get(r.p.currency) ?? 0) + r.total)
+    return [...by].map(([c, t]) => `+ ${formatMoney(t, c)}`)
+  }
 
   const needle = q.trim().toLowerCase()
   const visible = rows.filter(
@@ -46,8 +51,8 @@ export default function ProposalsPage() {
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={FileSignature} label="Total proposals" value={String(proposals.length)} sub={`${rows.filter((r) => r.status === 'draft').length} drafts`} />
-        <Stat icon={Send} label="Awaiting response" value={formatMoney(sum(open), cur)} sub={`${open.length} open`} tone="blue" />
-        <Stat icon={CheckCircle2} label="Accepted this month" value={formatMoney(sum(acceptedMonth), cur)} sub={`${acceptedMonth.length} signed`} tone="green" />
+        <Stat icon={Send} label="Awaiting response" value={formatMoney(sum(open), cur)} extra={others(open)} sub={`${open.length} open`} tone="blue" />
+        <Stat icon={CheckCircle2} label="Accepted this month" value={formatMoney(sum(acceptedMonth), cur)} extra={others(acceptedMonth)} sub={`${acceptedMonth.length} signed`} tone="green" />
         <Stat icon={Eye} label="Win rate" value={decided ? `${Math.round((accepted.length / decided) * 100)}%` : '—'} sub={`${accepted.length} of ${decided} decided`} tone="violet" />
       </div>
 
@@ -138,7 +143,7 @@ const tones = {
   violet: 'bg-violet-50 text-violet-600',
 }
 
-function Stat({ icon: Icon, label, value, sub, tone = 'default' }: { icon: LucideIcon; label: string; value: string; sub?: string; tone?: keyof typeof tones }) {
+function Stat({ icon: Icon, label, value, extra, sub, tone = 'default' }: { icon: LucideIcon; label: string; value: string; extra?: string[]; sub?: string; tone?: keyof typeof tones }) {
   return (
     <div className="rounded-2xl border border-zinc-200 p-5">
       <div className="flex items-center gap-3">
@@ -148,6 +153,11 @@ function Stat({ icon: Icon, label, value, sub, tone = 'default' }: { icon: Lucid
         <span className="text-sm font-medium text-zinc-500">{label}</span>
       </div>
       <div className="mt-4 text-2xl font-semibold tracking-tight text-zinc-900">{value}</div>
+      {extra?.map((x) => (
+        <div key={x} className="text-sm font-medium text-zinc-600">
+          {x}
+        </div>
+      ))}
       {sub && <div className="mt-0.5 text-xs text-zinc-500">{sub}</div>}
     </div>
   )

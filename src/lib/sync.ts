@@ -194,8 +194,23 @@ function startLoop() {
   window.addEventListener('focus', () => syncNow())
 }
 
+let markReady: () => void = () => {}
+/**
+ * Resolves after the first sync attempt on app start (or right away when signed out). Work that
+ * creates records automatically, like recurring invoices, waits for it so it sees other devices' data.
+ */
+export const syncReady = new Promise<void>((resolve) => (markReady = resolve))
+
 /** Called once on app start. */
 export async function initSync() {
+  try {
+    await startSync()
+  } finally {
+    markReady()
+  }
+}
+
+async function startSync() {
   const last = Number(store(KEY.last)) || null
   setStatus({ lastSync: last, pending: await pendingCount() })
   try {
@@ -208,7 +223,7 @@ export async function initSync() {
   } catch {
     // Offline at startup: keep working locally and retry when the connection comes back.
     setStatus({ state: 'offline' })
-    window.addEventListener('online', () => initSync(), { once: true })
+    window.addEventListener('online', () => startSync(), { once: true })
   }
 }
 

@@ -1,7 +1,8 @@
-import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, type LucideIcon } from 'lucide-react'
 import type { DisplayStatus } from '../lib/invoice'
+import { parseNumber, sanitizeNumberText } from '../lib/number'
 import type { ProposalDisplayStatus } from '../lib/proposal'
 
 export const inputCls =
@@ -172,5 +173,63 @@ export function initials(name: string): string {
       .slice(0, 2)
       .map((w) => w[0]?.toUpperCase() ?? '')
       .join('') || '?'
+  )
+}
+
+/**
+ * A number field that accepts what people paste or type — "25,000", Bengali digits, a trailing
+ * dot while typing — and can be cleared without snapping to 0. It reports a number on every
+ * valid change and tidies the text when it loses focus.
+ */
+export function NumberInput({
+  value,
+  onChange,
+  min = 0,
+  max,
+  integer,
+  allowNegative,
+  className = '',
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'min' | 'max' | 'type'> & {
+  value: number
+  onChange: (n: number) => void
+  min?: number
+  max?: number
+  integer?: boolean
+  allowNegative?: boolean
+}) {
+  const clampValue = (n: number) => {
+    let v = integer ? Math.trunc(n) : n
+    if (!allowNegative) v = Math.max(v, min)
+    if (max !== undefined) v = Math.min(v, max)
+    return v
+  }
+  const show = (n: number) => (Number.isFinite(n) ? String(n) : '')
+  const [text, setText] = useState(() => show(value))
+  // Follow changes made elsewhere (a product picked, a synced edit) unless they match what's typed.
+  useEffect(() => {
+    setText((t) => (parseNumber(t) === value || (t.trim() === '' && value === 0) ? t : show(value)))
+  }, [value])
+  return (
+    <input
+      {...props}
+      type="text"
+      inputMode={integer ? 'numeric' : 'decimal'}
+      autoComplete="off"
+      className={`${inputCls} ${className}`}
+      value={text}
+      onChange={(e) => {
+        const t = sanitizeNumberText(e.target.value, allowNegative)
+        setText(t)
+        const n = parseNumber(t)
+        if (t.trim() === '') onChange(clampValue(0))
+        else if (n !== null) onChange(clampValue(n))
+      }}
+      onBlur={(e) => {
+        const n = parseNumber(text)
+        setText(show(n === null ? value : clampValue(n)))
+        props.onBlur?.(e)
+      }}
+    />
   )
 }

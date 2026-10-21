@@ -1,9 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import { db, useSettings, type Product } from '../db'
-import { formatMoney } from '../lib/invoice'
+import { formatAmount } from '../lib/invoice'
 import { Package, Plus } from 'lucide-react'
-import { Button, Field, Modal, PageHeader, inputCls } from '../components/ui'
+import { Button, Field, Modal, NumberInput, PageHeader, inputCls } from '../components/ui'
 
 const blank = (): Product => ({ name: '', description: '', rate: 0, unit: '', createdAt: Date.now() })
 
@@ -56,7 +56,7 @@ export default function ProductsPage() {
                   <td className="px-4 py-3 font-medium text-zinc-900">{p.name}</td>
                   <td className="px-4 py-3 text-zinc-500">{p.description}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
-                    {formatMoney(Math.round(p.rate * 100), settings.currency)}
+                    {formatAmount(p.rate, settings.currency)}
                     {p.unit && <span className="text-zinc-400"> / {p.unit}</span>}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -80,7 +80,7 @@ export default function ProductsPage() {
               <textarea rows={2} className={inputCls} value={editing.description} onChange={(e) => set({ description: e.target.value })} />
             </Field>
             <Field label={`Rate (${settings.currency})`}>
-              <input type="number" min={0} step="any" className={inputCls} value={editing.rate} onChange={(e) => set({ rate: Number(e.target.value) })} />
+              <NumberInput value={editing.rate} onChange={(rate) => set({ rate })} />
             </Field>
             <Field label="Unit (optional)">
               <input className={inputCls} placeholder="hour, page, month…" value={editing.unit} onChange={(e) => set({ unit: e.target.value })} />

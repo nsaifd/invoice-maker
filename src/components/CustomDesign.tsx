@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { CustomTemplate, Invoice, Proposal, Settings, Zone } from '../db'
 import { fontStack, loadFont } from '../lib/fonts'
-import { calcTotals, formatDate, formatMoney } from '../lib/invoice'
+import { calcTotals, formatDate, formatMoney, toCents } from '../lib/invoice'
 import { proposalTotal } from '../lib/proposal'
 import { amountInWords } from '../lib/words'
 import { paymentRows } from './doc'
@@ -296,7 +296,7 @@ function ZoneItems({ inv, s, zone, accent }: { inv: Invoice; s: Settings; zone: 
           <tr key={it.id}>
             <td style={{ ...td, whiteSpace: 'pre-line' }}>{it.description || 'Item'}</td>
             <td style={{ ...td, textAlign: 'center' }}>{it.qty}</td>
-            <td style={{ ...td, textAlign: 'right' }}>{money(Math.round((Number(it.rate) || 0) * 100))}</td>
+            <td style={{ ...td, textAlign: 'right' }}>{money(toCents(it.rate))}</td>
             {showTax && <td style={{ ...td, textAlign: 'center' }}>{Number(it.taxRate) || 0}%</td>}
             <td style={{ ...td, textAlign: 'right' }}>{money(lines[i])}</td>
           </tr>

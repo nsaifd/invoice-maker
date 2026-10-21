@@ -5,7 +5,7 @@ import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, us
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Calendar, ChevronDown, ChevronUp, Copy, GripVertical, Hash, Plus, Trash2, X } from 'lucide-react'
-import { db, formatProposalNumber, getSettings, useSettings, type Currency, type Product, type Proposal, type ProposalBlock, type Settings } from '../db'
+import { bumpCounter, db, suggestNumber, useSettings, type Currency, type Product, type Proposal, type ProposalBlock, type Settings } from '../db'
 import { CURRENCIES, uid } from '../lib/invoice'
 import { BLOCKS, PRESETS, blockTitle, newProposal } from '../lib/proposal'
 import { COVERS, THEMES, applyTheme, themeById } from '../lib/proposalThemes'
@@ -40,7 +40,11 @@ export default function ProposalEditor() {
   useEffect(() => {
     if (!settings || doc) return
     if (id) db.proposals.get(id).then((found) => (found ? setDoc(found) : navigate('/proposals', { replace: true })))
-    else setDoc(newProposal(settings))
+    else {
+      const fresh = newProposal(settings)
+      setDoc(fresh)
+      suggestNumber('proposal').then((number) => setDoc((v) => (v && !v.id && v.number === fresh.number ? { ...v, number } : v)))
+    }
   }, [id, settings, doc, navigate])
 
   if (!settings || !doc) return null
@@ -82,13 +86,9 @@ export default function ProposalEditor() {
       let clientId = doc.clientId
       if (!clientId && saveClient) clientId = await db.clients.add({ ...doc.client, createdAt: Date.now() })
       const record: Proposal = { ...doc, clientId, updatedAt: Date.now() }
-      if (doc.id) {
-        await db.proposals.put(record)
-      } else {
-        const s = await getSettings()
-        if (record.number === formatProposalNumber(s)) await db.settings.put({ ...s, nextProposalNumber: s.nextProposalNumber + 1 })
-        savedId = await db.proposals.add(record)
-      }
+      if (doc.id) await db.proposals.put(record)
+      else savedId = await db.proposals.add(record)
+      await bumpCounter('proposal', record.number)
     })
     navigate(`/proposals/${savedId}`)
   }

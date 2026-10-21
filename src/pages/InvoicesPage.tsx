@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertCircle, BellRing, CheckCircle2, Clock, FileText, Mail, MessageCircle, Plus, Search, type LucideIcon } from 'lucide-react'
-import { db, useSettings } from '../db'
+import { db, useSettings, type Currency } from '../db'
 import { addDays, calcTotals, displayStatus, formatDate, formatMoney, todayISO, type DisplayStatus } from '../lib/invoice'
 import { openReminder } from '../lib/recurring'
 import { shareUrl, timeAgo } from '../lib/share'
@@ -29,11 +29,16 @@ export default function InvoicesPage() {
   if (!settings || !invoices) return null
   const cur = settings.currency
   const month = todayISO().slice(0, 7)
-  const inCur = rows.filter((r) => r.inv.currency === cur)
-  const outstanding = inCur.filter((r) => r.status === 'sent' || r.status === 'overdue')
-  const overdue = inCur.filter((r) => r.status === 'overdue')
-  const paidMonth = inCur.filter((r) => r.status === 'paid' && r.inv.paidAt?.startsWith(month))
-  const sum = (xs: typeof rows) => xs.reduce((a, r) => a + r.total, 0)
+  const outstanding = rows.filter((r) => r.status === 'sent' || r.status === 'overdue')
+  const overdue = rows.filter((r) => r.status === 'overdue')
+  const paidMonth = rows.filter((r) => r.status === 'paid' && r.inv.paidAt?.startsWith(month))
+  const sum = (xs: typeof rows) => xs.filter((r) => r.inv.currency === cur).reduce((a, r) => a + r.total, 0)
+  // Amounts in other currencies can't be added together, so they're listed separately.
+  const others = (xs: typeof rows) => {
+    const by = new Map<Currency, number>()
+    for (const r of xs) if (r.inv.currency !== cur) by.set(r.inv.currency, (by.get(r.inv.currency) ?? 0) + r.total)
+    return [...by].map(([c, t]) => `+ ${formatMoney(t, c)}`)
+  }
   const count = (n: number) => `${n} invoice${n === 1 ? '' : 's'}`
 
   const soon = addDays(todayISO(), 3)
@@ -73,9 +78,9 @@ export default function InvoicesPage() {
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={FileText} label="Total invoices" value={String(invoices.length)} sub={`${rows.filter((r) => r.status === 'draft').length} drafts`} />
-        <Stat icon={Clock} label="Outstanding" value={formatMoney(sum(outstanding), cur)} sub={count(outstanding.length)} tone="blue" />
-        <Stat icon={AlertCircle} label="Overdue" value={formatMoney(sum(overdue), cur)} sub={count(overdue.length)} tone="red" />
-        <Stat icon={CheckCircle2} label="Paid this month" value={formatMoney(sum(paidMonth), cur)} sub={count(paidMonth.length)} tone="green" />
+        <Stat icon={Clock} label="Outstanding" value={formatMoney(sum(outstanding), cur)} extra={others(outstanding)} sub={count(outstanding.length)} tone="blue" />
+        <Stat icon={AlertCircle} label="Overdue" value={formatMoney(sum(overdue), cur)} extra={others(overdue)} sub={count(overdue.length)} tone="red" />
+        <Stat icon={CheckCircle2} label="Paid this month" value={formatMoney(sum(paidMonth), cur)} extra={others(paidMonth)} sub={count(paidMonth.length)} tone="green" />
       </div>
 
       {attention.length > 0 && (
@@ -203,7 +208,7 @@ const tones = {
   green: 'bg-emerald-50 text-emerald-600',
 }
 
-function Stat({ icon: Icon, label, value, sub, tone = 'default' }: { icon: LucideIcon; label: string; value: string; sub?: string; tone?: keyof typeof tones }) {
+function Stat({ icon: Icon, label, value, extra, sub, tone = 'default' }: { icon: LucideIcon; label: string; value: string; extra?: string[]; sub?: string; tone?: keyof typeof tones }) {
   return (
     <div className="rounded-2xl border border-zinc-200 p-5">
       <div className="flex items-center gap-3">
@@ -213,6 +218,11 @@ function Stat({ icon: Icon, label, value, sub, tone = 'default' }: { icon: Lucid
         <span className="text-sm font-medium text-zinc-500">{label}</span>
       </div>
       <div className="mt-4 text-2xl font-semibold tracking-tight text-zinc-900">{value}</div>
+      {extra?.map((x) => (
+        <div key={x} className="text-sm font-medium text-zinc-600">
+          {x}
+        </div>
+      ))}
       {sub && <div className="mt-0.5 text-xs text-zinc-500">{sub}</div>}
     </div>
   )

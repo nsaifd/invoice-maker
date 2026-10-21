@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Calendar, Hash } from 'lucide-react'
-import { styleOf, db, formatInvoiceNumber, getSettings, useSettings, type Currency, type Invoice } from '../db'
+import { styleOf, bumpCounter, db, suggestNumber, useSettings, type Currency, type Invoice } from '../db'
 import { CURRENCIES, newInvoice } from '../lib/invoice'
 import { LAYOUTS, PRESETS, applyPreset, presetById } from '../lib/presets'
 import { LineItemsEditor, ProductPicker } from '../components/LineItemsEditor'
@@ -37,7 +37,12 @@ export default function InvoiceEditor() {
         if (!found) return navigate('/', { replace: true })
         setInv(found)
       })
-    else setInv(newInvoice(settings))
+    else {
+      const fresh = newInvoice(settings)
+      setInv(fresh)
+      // The counter's number may already be taken (typed by hand or synced from another device).
+      suggestNumber('invoice').then((number) => setInv((v) => (v && !v.id && v.number === fresh.number ? { ...v, number } : v)))
+    }
   }, [id, settings, inv, navigate])
 
   if (!settings || !inv) return null
@@ -67,14 +72,10 @@ export default function InvoiceEditor() {
       let clientId = inv.clientId
       if (!clientId && saveClient) clientId = await db.clients.add({ ...inv.client, createdAt: Date.now() })
       const record: Invoice = { ...inv, number: inv.number.trim(), items, clientId, updatedAt: Date.now() }
-      if (inv.id) {
-        await db.invoices.put(record)
-      } else {
-        const s = await getSettings()
-        // Only advance the counter when the auto-suggested number was used.
-        if (record.number === formatInvoiceNumber(s)) await db.settings.put({ ...s, nextNumber: s.nextNumber + 1 })
-        savedId = await db.invoices.add(record)
-      }
+      if (inv.id) await db.invoices.put(record)
+      else savedId = await db.invoices.add(record)
+      // Move the counter past this number, so the next invoice doesn't reuse it.
+      await bumpCounter('invoice', record.number)
     })
     navigate(`/invoices/${savedId}`)
   }

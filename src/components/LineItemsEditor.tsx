@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import type { Currency, Invoice, LineItem, Product, Settings } from '../db'
-import { CURRENCIES, calcTotals, formatMoney, newLineItem } from '../lib/invoice'
-import { inputCls } from './ui'
+import { CURRENCIES, calcTotals, formatAmount, formatMoney, newLineItem } from '../lib/invoice'
+import { NumberInput, inputCls } from './ui'
 
 type Priced = { items: LineItem[]; discountType: Invoice['discountType']; discountValue: number }
 
@@ -50,9 +50,9 @@ export function LineItemsEditor({
                 value={item.description}
                 onChange={(e) => setItem(i, { description: e.target.value })}
               />
-              <NumInput label="Qty" value={item.qty} onChange={(qty) => setItem(i, { qty })} />
-              <NumInput label="Rate" value={item.rate} onChange={(rate) => setItem(i, { rate })} />
-              <NumInput label={`${taxLabel} %`} value={item.taxRate} onChange={(taxRate) => setItem(i, { taxRate })} />
+              <NumInput label="Qty" allowNegative value={item.qty} onChange={(qty) => setItem(i, { qty })} />
+              <NumInput label="Rate" allowNegative value={item.rate} onChange={(rate) => setItem(i, { rate })} />
+              <NumInput label={`${taxLabel} %`} max={100} value={item.taxRate} onChange={(taxRate) => setItem(i, { taxRate })} />
               <div className="col-span-3 @md:col-span-1">
                 <span className="mb-0.5 block text-[11px] text-zinc-500 @2xl:hidden">Total</span>
                 <div className="truncate rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-sm text-zinc-600">{money(totals.lines[i])}</div>
@@ -94,13 +94,12 @@ export function LineItemsEditor({
           </label>
           {discountOn && (
             <div className="flex gap-2">
-              <input
-                type="number"
-                min={0}
+              <NumberInput
                 aria-label="Discount"
-                className={`${inputCls} w-28`}
+                className="w-28"
+                max={value.discountType === 'percent' ? 100 : undefined}
                 value={value.discountValue}
-                onChange={(e) => onChange({ discountValue: Number(e.target.value) })}
+                onChange={(discountValue) => onChange({ discountValue })}
               />
               <select className={`${inputCls} w-auto`} value={value.discountType} onChange={(e) => onChange({ discountType: e.target.value as Invoice['discountType'] })}>
                 <option value="percent">%</option>
@@ -152,26 +151,19 @@ export function ProductPicker({
       <option value="">+ Add saved product…</option>
       {products.map((p) => (
         <option key={p.id} value={p.id}>
-          {p.name} — {formatMoney(Math.round(p.rate * 100), currency)}
+          {p.name} — {formatAmount(p.rate, currency)}
         </option>
       ))}
     </select>
   )
 }
 
-function NumInput({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
+// Negative qty or rate makes a credit line (refund, deposit already paid).
+function NumInput({ label, value, onChange, ...limits }: { label: string; value: number; onChange: (n: number) => void; allowNegative?: boolean; max?: number }) {
   return (
     <label>
       <span className="mb-0.5 block text-[11px] text-zinc-500 @2xl:hidden">{label}</span>
-      <input
-        type="number"
-        min={0}
-        step="any"
-        aria-label={label}
-        className={`${inputCls} px-2.5 py-2`}
-        value={Number.isNaN(value) ? '' : value}
-        onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
-      />
+      <NumberInput aria-label={label} className="px-2.5 py-2" value={value} onChange={onChange} {...limits} />
     </label>
   )
 }

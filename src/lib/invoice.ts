@@ -10,19 +10,36 @@ export const CURRENCIES: Record<Currency, { symbol: string; locale: string; labe
 }
 
 // All money math happens in integer cents (paisa) to avoid floating-point errors.
-const toCents = (n: number) => Math.round((Number(n) || 0) * 100)
+
+/** Rounds half away from zero, so a credit of -0.5 paisa rounds like +0.5 does. */
+const round = (x: number) => (Number.isFinite(x) ? Math.sign(x) * Math.round(Math.abs(x)) || 0 : 0)
+
+/**
+ * Converts an amount to integer cents. `1.005 * 100` is 100.4999… in floating point, so the
+ * decimal point is shifted in the number's text form instead ("1.005e2" is exactly 100.5).
+ */
+export function toCents(n: number): number {
+  const v = Number(n)
+  if (!Number.isFinite(v)) return 0
+  const abs = Math.abs(v)
+  const shifted = String(abs).includes('e') ? abs * 100 : Number(`${abs}e2`)
+  return Math.sign(v) * Math.round(shifted) || 0
+}
+
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
 export function calcTotals(inv: Pick<Invoice, 'items' | 'discountType' | 'discountValue'>) {
-  const lines = inv.items.map((i) => Math.round((Number(i.qty) || 0) * toCents(i.rate)))
+  const lines = inv.items.map((i) => round((Number(i.qty) || 0) * toCents(i.rate)))
   const subtotal = sum(lines)
+  // Discounts only apply to a positive subtotal (a credit note isn't "discounted" further).
+  const base = Math.max(subtotal, 0)
   const discount =
     inv.discountType === 'percent'
-      ? Math.round((subtotal * Math.min(Math.max(Number(inv.discountValue) || 0, 0), 100)) / 100)
-      : Math.min(Math.max(toCents(inv.discountValue), 0), subtotal)
+      ? round((base * Math.min(Math.max(Number(inv.discountValue) || 0, 0), 100)) / 100)
+      : Math.min(Math.max(toCents(inv.discountValue), 0), base)
   // Discount is spread proportionally across lines before tax.
   const factor = subtotal ? (subtotal - discount) / subtotal : 0
-  const tax = Math.round(sum(lines.map((l, idx) => (l * (Number(inv.items[idx].taxRate) || 0)) / 100)) * factor)
+  const tax = round(sum(lines.map((l, idx) => (l * (Number(inv.items[idx].taxRate) || 0)) / 100)) * factor)
   return { lines, subtotal, discount, tax, total: subtotal - discount + tax }
 }
 
@@ -30,6 +47,11 @@ export function formatMoney(cents: number, currency: Currency): string {
   const c = CURRENCIES[currency] ?? CURRENCIES.USD
   const n = (Math.abs(cents) / 100).toLocaleString(c.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   return `${cents < 0 ? '-' : ''}${c.symbol}${n}`
+}
+
+/** Formats a rate or price entered in whole currency units (e.g. 1250.5). */
+export function formatAmount(value: number, currency: Currency): string {
+  return formatMoney(toCents(value), currency)
 }
 
 export function todayISO(): string {

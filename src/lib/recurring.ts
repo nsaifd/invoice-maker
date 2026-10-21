@@ -9,18 +9,20 @@ export const FREQUENCIES: Record<Frequency, string> = {
   yearly: 'Yearly',
 }
 
-function addMonths(iso: string, months: number): string {
+function addMonths(iso: string, months: number, anchorDay?: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   const target = new Date(Date.UTC(y, m - 1 + months, 1))
-  // Clamp to the last day of the month (e.g. 31 Jan + 1 month → 28/29 Feb).
+  // Clamp to the last day of the month (e.g. 31 Jan + 1 month → 28/29 Feb), but aim for the
+  // original day every time, so a schedule on the 31st doesn't drift to the 28th forever.
   const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate()
-  target.setUTCDate(Math.min(d, lastDay))
+  target.setUTCDate(Math.min(anchorDay ?? d, lastDay))
   return target.toISOString().slice(0, 10)
 }
 
-export function nextOccurrence(iso: string, f: Frequency): string {
+/** `anchorDay` is the day of month the schedule started on (1–31). */
+export function nextOccurrence(iso: string, f: Frequency, anchorDay?: number): string {
   if (f === 'weekly') return addDays(iso, 7)
-  return addMonths(iso, f === 'monthly' ? 1 : f === 'quarterly' ? 3 : 12)
+  return addMonths(iso, f === 'monthly' ? 1 : f === 'quarterly' ? 3 : 12, anchorDay)
 }
 
 export function ruleFromInvoice(inv: Invoice, frequency: Frequency, nextDate: string, endDate?: string): RecurringRule {
@@ -30,6 +32,7 @@ export function ruleFromInvoice(inv: Invoice, frequency: Frequency, nextDate: st
     template: { clientId, client, currency, items, discountType, discountValue, notes, terms },
     frequency,
     nextDate,
+    anchorDay: Number(nextDate.slice(8, 10)) || undefined,
     endDate: endDate || undefined,
     active: true,
     generatedCount: 0,
@@ -53,7 +56,15 @@ export async function runRecurring(): Promise<number> {
       let next = fresh.nextDate
       let count = fresh.generatedCount
       for (let i = 0; i < 24 && next <= today && (!fresh.endDate || next <= fresh.endDate); i++) {
+        // One fixed id per rule and date: if two devices both create this occurrence before they
+        // sync, they write the same record instead of making a duplicate invoice.
+        const id = `rec-${fresh.id}-${next}`
+        if (await db.invoices.get(id)) {
+          next = nextOccurrence(next, fresh.frequency, fresh.anchorDay)
+          continue
+        }
         await db.invoices.add({
+          id,
           ...fresh.template,
           items: fresh.template.items.map((it) => ({ ...it, id: uid() })),
           number: await takeInvoiceNumber(),
@@ -66,7 +77,7 @@ export async function runRecurring(): Promise<number> {
         })
         created++
         count++
-        next = nextOccurrence(next, fresh.frequency)
+        next = nextOccurrence(next, fresh.frequency, fresh.anchorDay)
       }
       const ended = !!fresh.endDate && next > fresh.endDate
       await db.recurring.update(fresh.id!, { nextDate: next, generatedCount: count, active: !ended })

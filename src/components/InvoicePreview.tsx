@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, withStyle, type CustomTemplate, type Invoice, type Settings, type TemplateId } from '../db'
 import { CustomPage } from './CustomDesign'
-import { calcTotals, formatDate, formatMoney } from '../lib/invoice'
+import { calcTotals, formatDate, formatMoney, toCents } from '../lib/invoice'
 import { AmountWords, ItemsTable, PaymentBlock, ScaledFrame, SignatureBlock, TotalsBox, docFont, lookOf, type Look } from './doc'
 import { initials } from './ui'
 
@@ -524,7 +524,7 @@ function Receipt({ inv, s, L }: Ctx) {
             <div key={it.id} className="avoid-break">
               {row(<span className="font-medium text-zinc-900">{it.description || 'Item'}</span>, <span className="font-medium text-zinc-900">{money(t.lines[i])}</span>)}
               <div className="text-[0.88em] text-zinc-500">
-                {it.qty} × {money(Math.round((Number(it.rate) || 0) * 100))}
+                {it.qty} × {money(toCents(it.rate))}
                 {L.showTax && Number(it.taxRate) ? ` · ${taxOf(s)} ${it.taxRate}%` : ''}
               </div>
             </div>

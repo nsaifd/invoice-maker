@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowRightLeft, CheckCircle2, Copy, Download, FileText, Pencil, Send, Trash2, XCircle } from 'lucide-react'
-import { db, formatProposalNumber, getSettings, takeInvoiceNumber, useSettings, type Proposal, type ShareRef } from '../db'
+import { db, getSettings, takeInvoiceNumber, takeNumber, useSettings, type Proposal, type ShareRef } from '../db'
 import { addDays, formatDate, formatMoney, todayISO, uid } from '../lib/invoice'
 import { blockTitle, invoiceFromProposal, proposalDisplayStatus, proposalTotal } from '../lib/proposal'
 import { snapshot, timeAgo, type Activity } from '../lib/share'
@@ -84,7 +84,7 @@ export default function ProposalView() {
     const copy: Proposal = {
       ...structuredClone(p!),
       id: undefined,
-      number: formatProposalNumber(s),
+      number: '',
       status: 'draft',
       date,
       validUntil: addDays(date, s.proposalValidDays),
@@ -97,8 +97,7 @@ export default function ProposalView() {
     }
     copy.blocks = copy.blocks.map((b) => ({ ...b, id: uid() }))
     const newId = await db.transaction('rw', db.proposals, db.settings, async () => {
-      await db.settings.put({ ...s, nextProposalNumber: s.nextProposalNumber + 1 })
-      return db.proposals.add(copy)
+      return db.proposals.add({ ...copy, number: await takeNumber('proposal') })
     })
     navigate(`/proposals/${newId}/edit`)
   }

@@ -42,19 +42,23 @@ function international(n: number): string {
   return parts.join(' ')
 }
 
-const UNITS: Record<Currency, [major: string, minor: string, southAsian: boolean]> = {
-  BDT: ['Taka', 'Paisa', true],
-  INR: ['Rupees', 'Paise', true],
-  USD: ['US Dollars', 'Cents', false],
-  EUR: ['Euros', 'Cents', false],
-  GBP: ['Pounds', 'Pence', false],
+// [singular, plural] for the main unit and the hundredth, and whether to group in lakh/crore.
+const UNITS: Record<Currency, { major: [string, string]; minor: [string, string]; southAsian: boolean }> = {
+  BDT: { major: ['Taka', 'Taka'], minor: ['Paisa', 'Paisa'], southAsian: true },
+  INR: { major: ['Rupee', 'Rupees'], minor: ['Paisa', 'Paise'], southAsian: true },
+  USD: { major: ['US Dollar', 'US Dollars'], minor: ['Cent', 'Cents'], southAsian: false },
+  EUR: { major: ['Euro', 'Euros'], minor: ['Cent', 'Cents'], southAsian: false },
+  GBP: { major: ['Pound', 'Pounds'], minor: ['Penny', 'Pence'], southAsian: false },
 }
 
 /** 3053250 (cents), 'BDT' → "Taka Thirty Thousand Five Hundred Thirty-Two and Fifty Paisa Only" */
 export function amountInWords(cents: number, currency: Currency): string {
-  const [major, minor, sa] = UNITS[currency] ?? UNITS.USD
-  const whole = Math.floor(Math.abs(cents) / 100)
-  const frac = Math.abs(cents) % 100
-  const say = sa ? southAsian : international
-  return `${major} ${say(whole)}${frac ? ` and ${say(frac)} ${minor}` : ''} Only`
+  const u = UNITS[currency] ?? UNITS.USD
+  const abs = Math.round(Math.abs(Number(cents) || 0))
+  const whole = Math.floor(abs / 100)
+  const frac = abs % 100
+  const say = u.southAsian ? southAsian : international
+  const major = u.major[whole === 1 ? 0 : 1]
+  const minor = frac ? ` and ${say(frac)} ${u.minor[frac === 1 ? 0 : 1]}` : ''
+  return `${cents < 0 ? 'Minus ' : ''}${major} ${say(whole)}${minor} Only`
 }

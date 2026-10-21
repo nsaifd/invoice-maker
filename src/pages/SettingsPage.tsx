@@ -10,21 +10,26 @@ import { sampleInvoice } from '../lib/sample'
 import { InvoicePreview } from '../components/InvoicePreview'
 import { FitToWidth } from '../components/doc'
 import { AccountSettings } from '../components/AccountSettings'
-import { Button, Card, Field, PageHeader, inputCls } from '../components/ui'
+import { Button, Card, Field, NumberInput, PageHeader, inputCls } from '../components/ui'
 
 export default function SettingsPage() {
   const saved = useSettings()
   const [s, setS] = useState<Settings | null>(null)
+  const [dirty, setDirty] = useState(false)
   const [flash, setFlash] = useState('')
   const importRef = useRef<HTMLInputElement>(null)
 
+  // Show settings changed elsewhere (another device, an import) unless you're in the middle of editing.
   useEffect(() => {
-    if (saved && !s) setS(saved)
-  }, [saved, s])
+    if (saved && !dirty) setS(saved)
+  }, [saved, dirty])
 
   if (!s) return null
 
-  const set = (patch: Partial<Settings>) => setS({ ...s, ...patch })
+  const set = (patch: Partial<Settings>) => {
+    setS({ ...s, ...patch })
+    setDirty(true)
+  }
   const text = (k: keyof Settings) => ({
     value: String(s[k] ?? ''),
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set({ [k]: e.target.value }),
@@ -43,7 +48,11 @@ export default function SettingsPage() {
       ...s!,
       nextNumber: Math.max(1, Math.floor(s!.nextNumber) || 1),
       nextProposalNumber: Math.max(1, Math.floor(s!.nextProposalNumber) || 1),
+      taxRate: Math.min(Math.max(Number(s!.taxRate) || 0, 0), 100),
+      dueDays: Math.max(0, Math.floor(s!.dueDays) || 0),
+      proposalValidDays: Math.max(1, Math.floor(s!.proposalValidDays) || 1),
     })
+    setDirty(false)
     notify('Settings saved')
   }
 
@@ -80,6 +89,7 @@ export default function SettingsPage() {
       await writeAll(converted)
       const restored = await db.settings.get('default')
       setS(restored ? { ...defaultSettings, ...restored } : defaultSettings)
+      setDirty(false)
       notify('Backup restored')
     } catch (e) {
       alert(`Import failed: ${(e as Error).message}`)
@@ -179,16 +189,16 @@ export default function SettingsPage() {
               <input className={inputCls} placeholder="VAT, GST, Tax…" {...text('taxLabel')} />
             </Field>
             <Field label="Default tax rate (%)">
-              <input type="number" min={0} step="any" className={inputCls} value={s.taxRate} onChange={(e) => set({ taxRate: Number(e.target.value) })} />
+              <NumberInput max={100} value={s.taxRate} onChange={(taxRate) => set({ taxRate })} />
             </Field>
             <Field label="Invoice number prefix">
               <input className={inputCls} {...text('invoicePrefix')} />
             </Field>
             <Field label="Next invoice number">
-              <input type="number" min={1} className={inputCls} value={s.nextNumber} onChange={(e) => set({ nextNumber: Number(e.target.value) })} />
+              <NumberInput integer min={1} value={s.nextNumber} onChange={(nextNumber) => set({ nextNumber })} />
             </Field>
             <Field label="Payment due in (days)">
-              <input type="number" min={0} className={inputCls} value={s.dueDays} onChange={(e) => set({ dueDays: Number(e.target.value) })} />
+              <NumberInput integer value={s.dueDays} onChange={(dueDays) => set({ dueDays })} />
             </Field>
             <Field label="Default notes" className="sm:col-span-2">
               <textarea rows={2} className={inputCls} {...text('notes')} />
@@ -203,10 +213,10 @@ export default function SettingsPage() {
               <input className={inputCls} {...text('proposalPrefix')} />
             </Field>
             <Field label="Next number">
-              <input type="number" min={1} className={inputCls} value={s.nextProposalNumber} onChange={(e) => set({ nextProposalNumber: Number(e.target.value) })} />
+              <NumberInput integer min={1} value={s.nextProposalNumber} onChange={(nextProposalNumber) => set({ nextProposalNumber })} />
             </Field>
             <Field label="Valid for (days)">
-              <input type="number" min={1} className={inputCls} value={s.proposalValidDays} onChange={(e) => set({ proposalValidDays: Number(e.target.value) })} />
+              <NumberInput integer min={1} value={s.proposalValidDays} onChange={(proposalValidDays) => set({ proposalValidDays })} />
             </Field>
           </div>
         </Card>
