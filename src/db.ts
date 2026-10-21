@@ -25,6 +25,8 @@ export interface Settings {
   website: string
   address: string
   logo?: string
+  signature?: string
+  signatory: string
   currency: Currency
   taxLabel: string
   taxRate: number
@@ -115,6 +117,7 @@ export const defaultSettings: Settings = {
   phone: '',
   website: '',
   address: '',
+  signatory: '',
   currency: 'BDT',
   taxLabel: 'VAT',
   taxRate: 15,

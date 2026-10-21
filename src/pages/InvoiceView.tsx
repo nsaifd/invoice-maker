@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { CheckCircle2, Copy, Download, Mail, Pencil, RotateCcw, Send, Trash2 } from 'lucide-react'
 import { db, formatInvoiceNumber, getSettings, useSettings, type Invoice } from '../db'
 import { addDays, calcTotals, displayStatus, formatDate, formatMoney, todayISO, uid } from '../lib/invoice'
 import { ScaledPreview } from '../components/InvoicePreview'
@@ -14,8 +15,11 @@ export default function InvoiceView() {
   if (!settings || inv === undefined) return null
   if (inv === null)
     return (
-      <div className="py-20 text-center text-slate-500">
-        Invoice not found. <Link to="/" className="text-blue-600 underline">Back to invoices</Link>
+      <div className="py-20 text-center text-zinc-500">
+        Invoice not found.{' '}
+        <Link to="/" className="text-blue-600 underline">
+          Back to invoices
+        </Link>
       </div>
     )
 
@@ -77,41 +81,87 @@ export default function InvoiceView() {
   return (
     <>
       <PageHeader
+        crumbs={[{ label: 'Invoices', to: '/' }, { label: inv.number }]}
         title={inv.number}
+        subtitle={`${inv.client.name}${inv.client.company ? ` · ${inv.client.company}` : ''}`}
         actions={
           <>
-            <Button variant="secondary" onClick={() => navigate(`/invoices/${id}/edit`)}>Edit</Button>
-            <Button variant="secondary" onClick={duplicate}>Duplicate</Button>
-            <Button variant="secondary" onClick={email}>Email</Button>
-            <Button onClick={downloadPdf}>Download PDF</Button>
+            <Button variant="secondary" icon={Pencil} onClick={() => navigate(`/invoices/${id}/edit`)}>
+              Edit
+            </Button>
+            <Button variant="secondary" icon={Copy} onClick={duplicate}>
+              Duplicate
+            </Button>
+            <Button variant="ghost" icon={Trash2} className="hover:!bg-red-50 hover:!text-red-600" onClick={remove}>
+              Delete
+            </Button>
           </>
         }
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-xs print:hidden">
-        <StatusBadge status={status} />
-        <span className="text-slate-600">
-          {inv.client.name} · <span className="font-semibold text-slate-900">{total}</span> · due {formatDate(inv.dueDate)}
-          {inv.paidAt && ` · paid ${formatDate(inv.paidAt)}`}
-        </span>
-        <div className="ml-auto flex flex-wrap gap-2">
-          {inv.status === 'draft' && <Button variant="secondary" onClick={() => update({ status: 'sent' })}>Mark as sent</Button>}
-          {inv.status !== 'paid' ? (
-            <Button variant="secondary" className="!text-emerald-700" onClick={() => update({ status: 'paid', paidAt: todayISO() })}>Mark as paid</Button>
-          ) : (
-            <Button variant="secondary" onClick={() => update({ status: 'sent', paidAt: undefined })}>Mark as unpaid</Button>
-          )}
-          <Button variant="danger" onClick={remove}>Delete</Button>
-        </div>
-      </div>
+      <div className="grid items-start gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <aside className="space-y-4 xl:sticky xl:top-4 print:hidden">
+          <div className="rounded-2xl border border-zinc-200 p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-zinc-500">Status</span>
+              <StatusBadge status={status} />
+            </div>
+            <div className="mt-4 text-sm text-zinc-500">Amount</div>
+            <div className="text-2xl font-semibold tracking-tight text-zinc-900">{total}</div>
+            <dl className="mt-4 space-y-1.5 border-t border-zinc-100 pt-4 text-sm">
+              <Row label="Issued" value={formatDate(inv.issueDate)} />
+              <Row label="Due" value={formatDate(inv.dueDate)} />
+              {inv.paidAt && <Row label="Paid on" value={formatDate(inv.paidAt)} />}
+            </dl>
+            <div className="mt-5 grid gap-2">
+              {inv.status === 'draft' && (
+                <Button variant="secondary" icon={Send} onClick={() => update({ status: 'sent' })}>
+                  Mark as Sent
+                </Button>
+              )}
+              {inv.status !== 'paid' ? (
+                <Button variant="secondary" icon={CheckCircle2} className="!text-emerald-700" onClick={() => update({ status: 'paid', paidAt: todayISO() })}>
+                  Mark as Paid
+                </Button>
+              ) : (
+                <Button variant="secondary" icon={RotateCcw} onClick={() => update({ status: 'sent', paidAt: undefined })}>
+                  Mark as Unpaid
+                </Button>
+              )}
+            </div>
+          </div>
+          <p className="px-1 text-xs leading-relaxed text-zinc-500">
+            <b>Download PDF</b> opens the print dialog — choose <b>Save as PDF</b>. <b>Email</b> opens your mail app; attach the downloaded PDF before sending.
+          </p>
+        </aside>
 
-      <p className="mb-3 text-xs text-slate-500 print:hidden">
-        Tip: in the print dialog choose <b>Save as PDF</b> as the destination. "Email" opens your mail app — attach the downloaded PDF before sending.
-      </p>
-
-      <div className="mx-auto max-w-[calc(210mm+2.5rem)]">
-        <ScaledPreview invoice={inv} settings={settings} />
+        <ScaledPreview
+          invoice={inv}
+          settings={settings}
+          header={
+            <>
+              <span className="text-lg font-semibold text-zinc-900">Preview</span>
+              <div className="flex gap-2">
+                <Button variant="secondary" icon={Mail} onClick={email}>
+                  Email
+                </Button>
+                <Button icon={Download} onClick={downloadPdf}>
+                  Download PDF
+                </Button>
+              </div>
+            </>
+          }
+        />
       </div>
     </>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between">
+      <dt className="text-zinc-500">{label}</dt>
+      <dd className="font-medium text-zinc-900">{value}</dd>
+    </div>
   )
 }

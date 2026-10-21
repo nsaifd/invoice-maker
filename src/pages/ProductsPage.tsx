@@ -2,7 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import { db, useSettings, type Product } from '../db'
 import { formatMoney } from '../lib/invoice'
-import { Button, Card, Field, Modal, PageHeader, inputCls } from '../components/ui'
+import { Package, Plus } from 'lucide-react'
+import { Button, Field, Modal, PageHeader, inputCls } from '../components/ui'
 
 const blank = (): Product => ({ name: '', description: '', rate: 0, unit: '', createdAt: Date.now() })
 
@@ -23,13 +24,25 @@ export default function ProductsPage() {
 
   return (
     <>
-      <PageHeader title="Products & services" actions={<Button onClick={() => setEditing(blank())}>+ Add item</Button>} />
-      <p className="-mt-3 mb-6 text-sm text-slate-500">Save the things you sell often, then add them to an invoice in one click.</p>
-      {products && products.length === 0 && <Card className="py-12 text-center text-slate-500">No saved products or services yet.</Card>}
+      <PageHeader
+        title="Products & Services"
+        subtitle="Save what you sell often, then add it to an invoice in one click."
+        actions={
+          <Button icon={Plus} onClick={() => setEditing(blank())}>
+            Add Item
+          </Button>
+        }
+      />
+      {products && products.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-zinc-300 py-14 text-center text-sm text-zinc-500">
+          <Package className="mx-auto mb-3 h-8 w-8 text-zinc-300" />
+          No saved products or services yet.
+        </div>
+      )}
       {products && products.length > 0 && (
-        <Card className="overflow-x-auto p-0">
+        <div className="overflow-x-auto rounded-2xl border border-zinc-200">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
+            <thead className="bg-zinc-50 text-left text-xs text-zinc-500">
               <tr>
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Description</th>
@@ -39,12 +52,12 @@ export default function ProductsPage() {
             </thead>
             <tbody>
               {products.map((p) => (
-                <tr key={p.id} className="border-t border-slate-100">
-                  <td className="px-4 py-3 font-medium text-slate-900">{p.name}</td>
-                  <td className="px-4 py-3 text-slate-500">{p.description}</td>
+                <tr key={p.id} className="border-t border-zinc-100">
+                  <td className="px-4 py-3 font-medium text-zinc-900">{p.name}</td>
+                  <td className="px-4 py-3 text-zinc-500">{p.description}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     {formatMoney(Math.round(p.rate * 100), settings.currency)}
-                    {p.unit && <span className="text-slate-400"> / {p.unit}</span>}
+                    {p.unit && <span className="text-zinc-400"> / {p.unit}</span>}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <Button variant="ghost" onClick={() => setEditing(p)}>Edit</Button>
@@ -54,7 +67,7 @@ export default function ProductsPage() {
               ))}
             </tbody>
           </table>
-        </Card>
+        </div>
       )}
 
       <Modal open={!!editing} title={editing?.id ? 'Edit item' : 'New item'} onClose={() => setEditing(null)}>

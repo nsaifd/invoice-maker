@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Invoice, Settings } from '../db'
 import { calcTotals, formatDate, formatMoney } from '../lib/invoice'
+import { initials } from './ui'
 
 export function InvoicePreview({ invoice, settings }: { invoice: Invoice; settings: Settings }) {
   const t = calcTotals(invoice)
   const money = (c: number) => formatMoney(c, invoice.currency)
   const accent = settings.accentColor || '#2563eb'
+  const taxLabel = settings.taxLabel || 'Tax'
   const p = settings.payment
   const paymentRows = (
     [
@@ -21,138 +23,151 @@ export function InvoicePreview({ invoice, settings }: { invoice: Invoice; settin
     ] as const
   ).filter(([, v]) => v.trim())
   const c = invoice.client
+  const signName = settings.signatory || settings.businessName
 
   return (
     <div
-      className="print-area relative bg-white text-[13px] leading-relaxed text-slate-700 shadow-lg"
-      style={{ width: '210mm', minHeight: '297mm', padding: '16mm 16mm 20mm' }}
+      className="print-area relative flex flex-col bg-white text-[12.5px] leading-relaxed text-zinc-500"
+      style={{ width: '210mm', minHeight: '297mm', padding: '15mm 15mm 16mm' }}
     >
-      <div className="absolute inset-x-0 top-0 h-2" style={{ background: accent }} />
-
       {invoice.status === 'paid' && (
-        <div className="pointer-events-none absolute right-[16mm] top-[60mm] rotate-[-12deg] rounded-md border-4 border-emerald-500 px-4 py-1 text-3xl font-bold tracking-widest text-emerald-500 opacity-70">
+        <div className="pointer-events-none absolute right-[18mm] top-[52mm] rotate-[-12deg] rounded-lg border-[3px] border-emerald-500 px-4 py-0.5 text-2xl font-extrabold tracking-[0.2em] text-emerald-500 opacity-80">
           PAID
         </div>
       )}
 
       <header className="flex items-start justify-between gap-8">
-        <div className="min-w-0">
-          {settings.logo && <img src={settings.logo} alt="" className="mb-3 max-h-16 max-w-[180px] object-contain" />}
-          <div className="text-base font-semibold text-slate-900">{settings.businessName || 'Your Business Name'}</div>
-          <div className="whitespace-pre-line text-slate-500">{settings.address}</div>
-          <div className="text-slate-500">{[settings.phone, settings.email, settings.website].filter(Boolean).join(' · ')}</div>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className="text-3xl font-bold tracking-tight" style={{ color: accent }}>
-            INVOICE
+        <div>
+          <div className="text-[34px] font-extrabold leading-none tracking-tight text-zinc-900">INVOICE</div>
+          <div className="mt-3 flex items-center gap-2">
+            <span>Invoice Number</span>
+            <span className="rounded-md bg-zinc-100 px-2 py-0.5 font-medium text-zinc-700">#{invoice.number}</span>
           </div>
-          <div className="mt-1 font-medium text-slate-900">{invoice.number}</div>
         </div>
+        {settings.logo ? (
+          <img src={settings.logo} alt="" className="max-h-16 max-w-[160px] object-contain" />
+        ) : (
+          <div className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-white" style={{ background: accent }}>
+            {initials(settings.businessName || 'B')}
+          </div>
+        )}
       </header>
 
-      <section className="mt-10 grid grid-cols-2 gap-8">
+      <div className="-mx-[15mm] mt-7 border-t border-zinc-200" />
+
+      <section className="mt-7 grid grid-cols-2 gap-8">
+        <Party label="Billed by:" name={settings.businessName || 'Your Business'} lines={[settings.email, settings.phone, settings.website, settings.address]} />
+        <Party label="Billed to:" name={c.name || 'Client name'} lines={[c.company, c.email, c.phone, c.address]} />
+      </section>
+
+      <section className="mt-6 grid grid-cols-2 gap-8">
         <div>
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Bill to</div>
-          <div className="font-semibold text-slate-900">{c.name || 'Client name'}</div>
-          {c.company && <div>{c.company}</div>}
-          <div className="whitespace-pre-line text-slate-500">{c.address}</div>
-          <div className="text-slate-500">{[c.phone, c.email].filter(Boolean).join(' · ')}</div>
+          <div>Date Issue:</div>
+          <div className="font-semibold text-zinc-900">{formatDate(invoice.issueDate)}</div>
         </div>
-        <div className="ml-auto grid grid-cols-[auto_auto] gap-x-6 gap-y-1 self-start text-right">
-          <span className="text-slate-400">Issue date</span>
-          <span className="font-medium text-slate-900">{formatDate(invoice.issueDate)}</span>
-          <span className="text-slate-400">Due date</span>
-          <span className="font-medium text-slate-900">{formatDate(invoice.dueDate)}</span>
-          <span className="text-slate-400">Amount due</span>
-          <span className="font-semibold text-slate-900">{money(invoice.status === 'paid' ? 0 : t.total)}</span>
+        <div>
+          <div>Due Date:</div>
+          <div className="font-semibold text-zinc-900">{formatDate(invoice.dueDate)}</div>
         </div>
       </section>
 
-      <table className="mt-10 w-full border-collapse">
+      <div className="mt-8 mb-3">Invoice Items/Service:</div>
+      <table className="w-full border-collapse">
         <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wider text-white" style={{ background: accent }}>
-            <th className="px-3 py-2 font-semibold">Description</th>
-            <th className="w-16 px-3 py-2 text-right font-semibold">Qty</th>
-            <th className="w-28 px-3 py-2 text-right font-semibold">Rate</th>
-            <th className="w-16 px-3 py-2 text-right font-semibold">{settings.taxLabel || 'Tax'}</th>
-            <th className="w-32 px-3 py-2 text-right font-semibold">Amount</th>
+          <tr className="bg-zinc-50 text-left text-zinc-500">
+            <th className="rounded-l-md px-3 py-2.5 font-medium">Item Name</th>
+            <th className="w-14 px-3 py-2.5 text-center font-medium">QTY</th>
+            <th className="w-28 px-3 py-2.5 text-right font-medium">Rate</th>
+            <th className="w-16 px-3 py-2.5 text-center font-medium">{taxLabel}</th>
+            <th className="w-32 rounded-r-md px-3 py-2.5 text-right font-medium">Amount</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="text-zinc-800">
           {invoice.items.map((item, i) => (
-            <tr key={item.id} className="border-b border-slate-100 align-top">
-              <td className="whitespace-pre-line px-3 py-2.5 text-slate-900">{item.description || <span className="text-slate-300">Item description</span>}</td>
-              <td className="px-3 py-2.5 text-right">{item.qty}</td>
+            <tr key={item.id} className="border-b border-zinc-100 align-top">
+              <td className="whitespace-pre-line px-3 py-2.5">{item.description || <span className="text-zinc-300">Item name</span>}</td>
+              <td className="px-3 py-2.5 text-center">{item.qty}</td>
               <td className="px-3 py-2.5 text-right">{money(Math.round((Number(item.rate) || 0) * 100))}</td>
-              <td className="px-3 py-2.5 text-right">{Number(item.taxRate) || 0}%</td>
-              <td className="px-3 py-2.5 text-right font-medium text-slate-900">{money(t.lines[i])}</td>
+              <td className="px-3 py-2.5 text-center">{Number(item.taxRate) || 0}%</td>
+              <td className="px-3 py-2.5 text-right">{money(t.lines[i])}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <div className="mt-6 flex justify-end">
-        <div className="w-72">
-          <Row label="Subtotal" value={money(t.subtotal)} />
-          {t.discount > 0 && (
-            <Row
-              label={`Discount${invoice.discountType === 'percent' ? ` (${invoice.discountValue}%)` : ''}`}
-              value={`-${money(t.discount)}`}
-            />
-          )}
-          <Row label={settings.taxLabel || 'Tax'} value={money(t.tax)} />
-          <div className="mt-2 flex justify-between rounded-md px-3 py-2.5 text-base font-bold text-white" style={{ background: accent }}>
-            <span>Total</span>
-            <span>{money(t.total)}</span>
-          </div>
+      <div className="mt-4 rounded-lg bg-zinc-50 px-3 py-2">
+        <TotalRow label="Subtotal" value={money(t.subtotal)} />
+        {t.discount > 0 && (
+          <TotalRow label={`Discount${invoice.discountType === 'percent' ? ` (${invoice.discountValue}%)` : ''}`} value={`-${money(t.discount)}`} />
+        )}
+        <TotalRow label={taxLabel} value={money(t.tax)} />
+        <div className="mt-1 flex justify-between border-t border-zinc-200 pt-2.5 pb-1 text-[14px] font-bold text-zinc-900">
+          <span>Grand Total</span>
+          <span style={{ color: accent }}>{money(t.total)}</span>
         </div>
       </div>
 
-      <section className="mt-12 grid grid-cols-2 gap-8">
-        {(paymentRows.length > 0 || p.other.trim()) && (
-          <div>
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Payment details</div>
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+      {invoice.notes.trim() && (
+        <div className="mt-4 whitespace-pre-line rounded-md border border-zinc-200 px-3 py-2 text-zinc-600">
+          <span className="font-medium text-zinc-800">Note: </span>
+          {invoice.notes}
+        </div>
+      )}
+      {invoice.terms.trim() && <div className="mt-3 whitespace-pre-line text-[11.5px]">{invoice.terms}</div>}
+
+      <footer className="mt-auto flex items-end justify-between gap-8 pt-10">
+        <div>
+          {(paymentRows.length > 0 || p.other.trim()) && (
+            <>
+              <div className="mb-1 font-semibold text-zinc-900">Payment Method</div>
               {paymentRows.map(([k, v]) => (
-                <div key={k} className="contents">
-                  <span className="text-slate-400">{k}</span>
-                  <span className="font-medium text-slate-900">{v}</span>
+                <div key={k}>
+                  {k}: <span className="text-zinc-700">{v}</span>
                 </div>
               ))}
-            </div>
-            {p.other.trim() && <div className="mt-1 whitespace-pre-line">{p.other}</div>}
-          </div>
-        )}
-        <div className="space-y-4">
-          {invoice.notes.trim() && (
-            <div>
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Notes</div>
-              <div className="whitespace-pre-line">{invoice.notes}</div>
-            </div>
-          )}
-          {invoice.terms.trim() && (
-            <div>
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Terms</div>
-              <div className="whitespace-pre-line text-slate-500">{invoice.terms}</div>
-            </div>
+              {p.other.trim() && <div className="whitespace-pre-line">{p.other}</div>}
+            </>
           )}
         </div>
-      </section>
+        {(settings.signature || signName) && (
+          <div className="min-w-40 text-center">
+            {settings.signature ? <img src={settings.signature} alt="" className="mx-auto mb-1 max-h-14 max-w-[160px] object-contain" /> : <div className="h-12" />}
+            <div className="border-t border-zinc-300 pt-1.5 font-semibold text-zinc-900">{signName}</div>
+            <div className="text-[11px]">Authorized signature</div>
+          </div>
+        )}
+      </footer>
     </div>
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Party({ label, name, lines }: { label: string; name: string; lines: string[] }) {
   return (
-    <div className="flex justify-between border-b border-slate-100 px-3 py-1.5">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-900">{value}</span>
+    <div>
+      <div className="mb-1">{label}</div>
+      <div className="font-semibold text-zinc-900">{name}</div>
+      {lines
+        .filter((l) => l?.trim())
+        .map((l, i) => (
+          <div key={i} className="whitespace-pre-line">
+            {l}
+          </div>
+        ))}
     </div>
   )
 }
 
-/** Scales the A4 page down to fit its container, so it never forces horizontal scrolling. */
-export function ScaledPreview({ invoice, settings }: { invoice: Invoice; settings: Settings }) {
+function TotalRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between py-1.5">
+      <span>{label}</span>
+      <span className="font-medium text-zinc-800">{value}</span>
+    </div>
+  )
+}
+
+/** Gray "desk" with the A4 page scaled to fit its width, so it never forces horizontal scrolling. */
+export function ScaledPreview({ invoice, settings, header }: { invoice: Invoice; settings: Settings; header?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
   useEffect(() => {
@@ -164,10 +179,13 @@ export function ScaledPreview({ invoice, settings }: { invoice: Invoice; setting
     return () => ro.disconnect()
   }, [])
   return (
-    <div className="rounded-lg bg-slate-200/70 p-3 sm:p-5">
-      <div ref={ref} className="mx-auto max-w-[210mm]">
-        <div className="preview-zoom" style={{ zoom }}>
-          <InvoicePreview invoice={invoice} settings={settings} />
+    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
+      {header && <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-white px-5 py-3.5">{header}</div>}
+      <div className="p-4 sm:p-6">
+        <div ref={ref} className="mx-auto max-w-[210mm]">
+          <div className="preview-zoom rounded-sm shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_-6px_rgba(0,0,0,0.08)]" style={{ zoom }}>
+            <InvoicePreview invoice={invoice} settings={settings} />
+          </div>
         </div>
       </div>
     </div>

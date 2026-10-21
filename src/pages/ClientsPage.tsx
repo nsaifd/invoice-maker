@@ -2,7 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import { db, emptyClient, type Client } from '../db'
 import { ClientFields } from '../components/ClientFields'
-import { Button, Card, Modal, PageHeader } from '../components/ui'
+import { Mail, MapPin, Phone, Plus, Users } from 'lucide-react'
+import { Button, Card, Modal, PageHeader, initials } from '../components/ui'
 
 export default function ClientsPage() {
   const clients = useLiveQuery(() => db.clients.orderBy('name').toArray(), [])
@@ -22,19 +23,35 @@ export default function ClientsPage() {
 
   return (
     <>
-      <PageHeader title="Clients" actions={<Button onClick={() => setEditing({ ...emptyClient, createdAt: Date.now() })}>+ Add client</Button>} />
-      {clients && clients.length === 0 && <Card className="py-12 text-center text-slate-500">No clients yet. Clients are also saved automatically when you create an invoice.</Card>}
+      <PageHeader
+        title="Clients"
+        subtitle="People and companies you bill."
+        actions={
+          <Button icon={Plus} onClick={() => setEditing({ ...emptyClient, createdAt: Date.now() })}>
+            Add Client
+          </Button>
+        }
+      />
+      {clients && clients.length === 0 && <div className="rounded-2xl border border-dashed border-zinc-300 py-14 text-center text-sm text-zinc-500">
+          <Users className="mx-auto mb-3 h-8 w-8 text-zinc-300" />
+          No clients yet. Clients are also saved automatically when you create an invoice.
+        </div>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {clients?.map((c) => (
           <Card key={c.id}>
-            <div className="font-semibold text-slate-900">{c.name}</div>
-            {c.company && <div className="text-sm text-slate-600">{c.company}</div>}
-            <div className="mt-2 space-y-0.5 text-sm text-slate-500">
-              {c.email && <div className="truncate">{c.email}</div>}
-              {c.phone && <div>{c.phone}</div>}
-              {c.address && <div className="whitespace-pre-line">{c.address}</div>}
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700">{initials(c.name)}</span>
+              <div className="min-w-0">
+                <div className="truncate font-semibold text-zinc-900">{c.name}</div>
+                {c.company && <div className="truncate text-sm text-zinc-500">{c.company}</div>}
+              </div>
             </div>
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4 space-y-1.5 text-sm text-zinc-600">
+              {c.email && <div className="flex items-center gap-2 truncate"><Mail className="h-4 w-4 shrink-0 text-zinc-400" />{c.email}</div>}
+              {c.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 shrink-0 text-zinc-400" />{c.phone}</div>}
+              {c.address && <div className="flex gap-2 whitespace-pre-line"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />{c.address}</div>}
+            </div>
+            <div className="mt-5 flex gap-2 border-t border-zinc-100 pt-4">
               <Button variant="secondary" onClick={() => setEditing(c)}>Edit</Button>
               <Button variant="ghost" className="hover:!text-red-600" onClick={() => remove(c)}>Delete</Button>
             </div>

@@ -81,6 +81,7 @@ export default function SettingsPage() {
     <>
       <PageHeader
         title="Settings"
+        subtitle="Your business details, invoice defaults and backups."
         actions={
           <>
             {flash && <span className="self-center text-sm text-emerald-600">{flash}</span>}
@@ -93,8 +94,8 @@ export default function SettingsPage() {
         <Card>
           <h2 className="mb-4 font-semibold">Business</h2>
           <div className="mb-4 flex items-center gap-4">
-            <div className="flex h-16 w-32 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50">
-              {s.logo ? <img src={s.logo} alt="Logo" className="max-h-14 max-w-28 object-contain" /> : <span className="text-xs text-slate-400">No logo</span>}
+            <div className="flex h-16 w-32 items-center justify-center rounded-md border border-dashed border-zinc-300 bg-zinc-50">
+              {s.logo ? <img src={s.logo} alt="Logo" className="max-h-14 max-w-28 object-contain" /> : <span className="text-xs text-zinc-400">No logo</span>}
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="cursor-pointer text-sm font-medium text-blue-600 hover:underline">
@@ -102,7 +103,7 @@ export default function SettingsPage() {
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => onLogo(e.target.files?.[0])} />
               </label>
               {s.logo && (
-                <button type="button" className="text-left text-sm text-slate-500 hover:text-red-600" onClick={() => set({ logo: undefined })}>
+                <button type="button" className="text-left text-sm text-zinc-500 hover:text-red-600" onClick={() => set({ logo: undefined })}>
                   Remove
                 </button>
               )}
@@ -124,6 +125,30 @@ export default function SettingsPage() {
             <Field label="Address" className="sm:col-span-2">
               <textarea rows={2} className={inputCls} {...text('address')} />
             </Field>
+          </div>
+
+          <div className="mt-6 border-t border-zinc-100 pt-5">
+            <div className="mb-3 text-sm font-medium text-zinc-700">Signature</div>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50">
+                {s.signature ? <img src={s.signature} alt="Signature" className="max-h-14 max-w-36 object-contain" /> : <span className="text-xs text-zinc-400">No signature</span>}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="cursor-pointer text-sm font-medium text-blue-600 hover:underline">
+                  Upload signature
+                  <input type="file" accept="image/*" className="hidden" onChange={async (e) => e.target.files?.[0] && set({ signature: await resizeImage(e.target.files[0], 480) })} />
+                </label>
+                {s.signature && (
+                  <button type="button" className="text-left text-sm text-zinc-500 hover:text-red-600" onClick={() => set({ signature: undefined })}>
+                    Remove
+                  </button>
+                )}
+              </div>
+              <Field label="Name under signature" className="min-w-48 flex-1">
+                <input className={inputCls} placeholder={s.businessName || 'Your name'} {...text('signatory')} />
+              </Field>
+            </div>
+            <p className="mt-2 text-xs text-zinc-500">Tip: sign on white paper, take a photo, and upload a tightly cropped PNG.</p>
           </div>
         </Card>
 
@@ -154,8 +179,8 @@ export default function SettingsPage() {
             </Field>
             <Field label="Brand color">
               <div className="flex items-center gap-2">
-                <input type="color" className="h-9 w-12 cursor-pointer rounded border border-slate-300" value={s.accentColor} onChange={(e) => set({ accentColor: e.target.value })} />
-                <span className="text-sm text-slate-500">{s.accentColor}</span>
+                <input type="color" className="h-9 w-12 cursor-pointer rounded border border-zinc-300" value={s.accentColor} onChange={(e) => set({ accentColor: e.target.value })} />
+                <span className="text-sm text-zinc-500">{s.accentColor}</span>
               </div>
             </Field>
             <Field label="Default notes" className="sm:col-span-2">
@@ -169,7 +194,7 @@ export default function SettingsPage() {
 
         <Card>
           <h2 className="mb-1 font-semibold">Payment details</h2>
-          <p className="mb-4 text-sm text-slate-500">Only filled fields are shown on invoices.</p>
+          <p className="mb-4 text-sm text-zinc-500">Only filled fields are shown on invoices.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Bank name"><input className={inputCls} {...pay('bankName')} /></Field>
             <Field label="Account name"><input className={inputCls} {...pay('accountName')} /></Field>
@@ -188,12 +213,12 @@ export default function SettingsPage() {
 
         <Card>
           <h2 className="mb-1 font-semibold">Backup & restore</h2>
-          <p className="mb-4 text-sm text-slate-500">
+          <p className="mb-4 text-sm text-zinc-500">
             Your data is stored only in this browser. Export a backup regularly, and use it to move your data to another device or browser.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={exportData}>Export backup (.json)</Button>
-            <label className="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50">
+            <label className="inline-flex cursor-pointer items-center rounded-md border border-zinc-300 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 shadow-xs hover:bg-zinc-50">
               Import backup…
               <input ref={importRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => importData(e.target.files?.[0])} />
             </label>
