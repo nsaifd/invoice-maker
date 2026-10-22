@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Cloud, KeyRound, Loader2, LogOut, RefreshCw, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CloudOff, KeyRound, Loader2, LogOut, RefreshCw, Trash2 } from 'lucide-react'
 import { changePassword, deleteAccount, passwordProblem, regenerateRecoveryCode } from '../lib/auth'
-import { forgetAccount, hasUnsyncedChanges, signOut, syncNow, useSyncStatus } from '../lib/sync'
+import { confirmSignOut, forgetAccount, syncNow, useSyncStatus } from '../lib/sync'
 import { RecoveryCode } from '../pages/AuthPage'
 import { SyncBadge } from './Layout'
 import { Button, Card, Field, Modal, inputCls } from './ui'
@@ -17,39 +17,31 @@ export function AccountSettings() {
 
   if (status.state === 'loading') return null
 
+  // Signed-out people are sent to the login page; this is the offline-at-startup case.
   if (!status.user)
     return (
-      <Card className="lg:col-span-2">
-        <div id="account" className="flex flex-wrap items-center gap-5">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-[#2E5AF5]">
-            <Cloud className="h-6 w-6" />
+      <Card className="lg:col-span-2" id="account">
+        <div className="flex flex-wrap items-center gap-5">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <CloudOff className="h-6 w-6" />
           </span>
           <div className="min-w-56 flex-1">
             <h2 className="font-semibold">Account & sync</h2>
-            <p className="mt-0.5 text-sm text-zinc-500">Your data is only saved in this browser. Create a free account to use Involet on all your devices and keep a safe copy in the cloud.</p>
-          </div>
-          <div className="flex gap-2">
-            <Link to="/signup" className="rounded-lg bg-[#2E5AF5] px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              Create account
-            </Link>
-            <Link to="/login" className="rounded-lg border border-zinc-200 px-3.5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
-              Log in
-            </Link>
+            <p className="mt-0.5 text-sm text-zinc-500">You’re offline. Your changes are saved on this device and will sync when you’re back online.</p>
           </div>
         </div>
       </Card>
     )
 
   async function logOut() {
-    if ((await hasUnsyncedChanges()) && !confirm('Some changes haven’t synced yet (you may be offline). If you log out now they will be lost. Log out anyway?')) return
     setBusy(true)
-    await signOut()
-    navigate('/login')
+    if (await confirmSignOut()) navigate('/login', { replace: true })
+    else setBusy(false)
   }
 
   return (
-    <Card className="lg:col-span-2">
-      <div id="account" className="flex flex-wrap items-center gap-5">
+    <Card className="lg:col-span-2" id="account">
+      <div className="flex flex-wrap items-center gap-5">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#2E5AF5] text-lg font-semibold uppercase text-white">{status.user.email[0]}</span>
         <div className="min-w-56 flex-1">
           <h2 className="font-semibold">{status.user.email}</h2>

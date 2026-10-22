@@ -54,8 +54,12 @@ export function Button({
   )
 }
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-zinc-200 bg-white p-6 ${className}`}>{children}</div>
+export function Card({ children, className = '', id }: { children: ReactNode; className?: string; id?: string }) {
+  return (
+    <div id={id} className={`scroll-mt-6 rounded-2xl border border-zinc-200 bg-white p-6 ${className}`}>
+      {children}
+    </div>
+  )
 }
 
 export function SectionTitle({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {

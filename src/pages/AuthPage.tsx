@@ -1,16 +1,19 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Check, Cloud, Copy, Download, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, ShieldCheck, WifiOff } from 'lucide-react'
 import { db } from '../db'
 import { login, passwordProblem, recover, signup, type User } from '../lib/auth'
-import { onSignedIn } from '../lib/sync'
+import { onSignedIn, useSyncStatus } from '../lib/sync'
 import { Button, Field, IconInput, inputCls } from '../components/ui'
 
 type Mode = 'login' | 'signup' | 'recover'
 
 export default function AuthPage({ mode }: { mode: Mode }) {
   const navigate = useNavigate()
+  const status = useSyncStatus()
+  // Where to go after logging in: the page that sent you here, or the dashboard.
+  const from = (useLocation().state as { from?: string } | null)?.from ?? '/'
   const localCount = useLiveQuery(async () => (await db.invoices.count()) + (await db.proposals.count()) + (await db.clients.count()), []) ?? 0
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,8 +26,11 @@ export default function AuthPage({ mode }: { mode: Mode }) {
   async function finish(user: User) {
     setBusy(localCount ? 'Uploading your data…' : 'Getting your data…')
     await onSignedIn(user)
-    navigate('/', { replace: true })
+    navigate(from, { replace: true })
   }
+
+  // Already logged in: open the app.
+  if (status.user && !busy && !issued) return <Navigate to={from} replace />
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -59,15 +65,19 @@ export default function AuthPage({ mode }: { mode: Mode }) {
           ) : (
             <>
               <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-                {mode === 'signup' ? 'Create your free account' : mode === 'recover' ? 'Reset your password' : 'Welcome back'}
+                {mode === 'signup' ? 'Create your free account' : mode === 'recover' ? 'Reset your password' : 'Log in to Involet'}
               </h1>
               <p className="mt-1.5 text-sm text-zinc-500">
                 {mode === 'signup'
                   ? 'Access your invoices and proposals from any device.'
                   : mode === 'recover'
                     ? 'Use the recovery code you saved when you created your account.'
-                    : 'Log in to sync your invoices and proposals.'}
+                    : 'Log in to your invoices and proposals.'}
               </p>
+
+              {mode === 'login' && status.error && (
+                <div className="mt-5 rounded-xl bg-amber-50 px-3.5 py-3 text-sm text-amber-800">{status.error}</div>
+              )}
 
               {mode !== 'recover' && localCount > 0 && (
                 <div className="mt-5 flex gap-2.5 rounded-xl bg-blue-50 px-3.5 py-3 text-sm text-blue-800">
@@ -169,11 +179,6 @@ export default function AuthPage({ mode }: { mode: Mode }) {
                     </Link>
                   </p>
                 )}
-                <p>
-                  <Link to="/" className="hover:text-zinc-900">
-                    Continue without an account
-                  </Link>
-                </p>
               </div>
             </>
           )}

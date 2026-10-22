@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Palette } from 'lucide-react'
 import { SYNC_TABLES, db, defaultSettings, useSettings, type Currency, type PaymentDetails, type Settings } from '../db'
 import { CURRENCIES } from '../lib/invoice'
@@ -18,6 +18,13 @@ export default function SettingsPage() {
   const [dirty, setDirty] = useState(false)
   const [flash, setFlash] = useState('')
   const importRef = useRef<HTMLInputElement>(null)
+
+  // Links like /settings#account open at that section.
+  const { hash } = useLocation()
+  const loaded = !!s
+  useEffect(() => {
+    if (loaded && hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [loaded, hash])
 
   // Show settings changed elsewhere (another device, an import) unless you're in the middle of editing.
   useEffect(() => {
@@ -114,7 +121,7 @@ export default function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <AccountSettings />
 
-        <Card>
+        <Card id="business">
           <h2 className="mb-4 font-semibold">Business</h2>
           <div className="mb-4 flex items-center gap-4">
             <div className="flex h-16 w-32 items-center justify-center rounded-md border border-dashed border-zinc-300 bg-zinc-50">

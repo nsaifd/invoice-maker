@@ -239,6 +239,18 @@ export async function hasUnsyncedChanges(): Promise<boolean> {
   return (await pendingCount()) > 0
 }
 
+/** Whether someone has signed in on this device before (their data may be here, e.g. while offline). */
+export function deviceHasAccount(): boolean {
+  return !!store(KEY.owner)
+}
+
+/** Asks first when some changes haven't reached the cloud yet. Returns false if cancelled. */
+export async function confirmSignOut(): Promise<boolean> {
+  if ((await hasUnsyncedChanges()) && !confirm('Some changes haven’t synced yet (you may be offline). If you log out now they will be lost. Log out anyway?')) return false
+  await signOut()
+  return true
+}
+
 /** Signs out and removes this device's copy (it stays in the account). */
 export async function signOut() {
   await syncNow().catch(() => {})
