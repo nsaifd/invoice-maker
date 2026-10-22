@@ -14,16 +14,14 @@
     // redirects logged-out visitors from the app's home page, and handles the API.
     "run_worker_first": true
   },
-  // Both hostnames are listed so a deploy keeps them (Wrangler replaces domains not listed here).
-  "routes": [
-    { "pattern": "involet.saifux.co", "custom_domain": true },
-    { "pattern": "home.involet.saifux.co", "custom_domain": true }
-  ],
+  // Domains (involet.saifux.co) are managed in the dashboard, so no "routes" key here:
+  // with one, every deploy would replace the dashboard's domains with this list.
   // The marketing site is its own Worker; it's served on home.involet.saifux.co through this one.
   "services": [{ "binding": "LANDING", "service": "black-sunset-577c" }],
   "vars": {
-    // Where visitors without an account land.
-    "LANDING_URL": "https://home.involet.saifux.co"
+    // Where visitors without an account land. When home.involet.saifux.co is attached to this
+    // Worker (Settings → Domains & Routes), set this to https://home.involet.saifux.co.
+    "LANDING_URL": "https://black-sunset-577c.connect-saifd.workers.dev"
   },
   // No database_id: Wrangler creates the D1 database automatically on first deploy.
   "d1_databases": [{ "binding": "DB", "database_name": "invoice-maker-db" }]
