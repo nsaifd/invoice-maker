@@ -8,6 +8,35 @@ interface Env {
   ASSETS: Fetcher
   /** Marketing site. Visitors who aren't logged in are sent here from the home page. */
   LANDING_URL?: string
+  /** The landing-page Worker, served on LANDING_URL's hostname through this Worker. */
+  LANDING?: Fetcher
+}
+
+// The landing page's sign-up and sign-in buttons should open the app. It is a separate static
+// site, so this small script (added to its pages) sends those clicks here, keeping other links.
+const LANDING_LINKS = (app: string) => `<script>
+document.addEventListener('click', function (e) {
+  var el = e.target.closest && e.target.closest('a,button');
+  if (!el || el.closest('form') || el.hasAttribute('aria-expanded')) return;
+  var href = el.getAttribute('href') || '';
+  if (href.indexOf(${JSON.stringify(app)}) === 0) return;
+  var t = (el.textContent || '').trim().toLowerCase();
+  if (!t || t.length > 30) return;
+  var to = /^(sign ?in|log ?in)/.test(t) ? '/login' : /(start|get started|try|sign ?up|create account|join)/.test(t) ? '/signup' : '';
+  if (!to) return;
+  e.preventDefault(); e.stopPropagation();
+  location.href = ${JSON.stringify(app)} + to;
+}, true);
+</script>`
+
+async function serveLanding(req: Request, env: Env, appOrigin: string): Promise<Response> {
+  const res = await env.LANDING!.fetch(req)
+  if (!(res.headers.get('content-type') ?? '').includes('text/html')) return res
+  return new HTMLRewriter().on('body', {
+    element(body) {
+      body.append(LANDING_LINKS(appOrigin), { html: true })
+    },
+  }).transform(res)
 }
 
 type Kind = 'proposal' | 'invoice'
@@ -273,6 +302,9 @@ async function handleApi(req: Request, env: Env, path: string[]): Promise<Respon
 export default {
   async fetch(req, env): Promise<Response> {
     const url = new URL(req.url)
+    const landing = env.LANDING_URL ? new URL(env.LANDING_URL) : null
+    // home.involet.saifux.co is the landing page; its buttons lead to involet.saifux.co.
+    if (landing && env.LANDING && url.hostname === landing.hostname) return serveLanding(req, env, `${url.protocol}//${url.host.replace(/^home\./, '')}`)
     // The home page shows the marketing site to visitors without a session; logged-in people
     // go straight to their dashboard. Every other page (login, share links…) works as usual.
     if (url.pathname === '/' && env.LANDING_URL && !/(?:^|;\s*)involet_session=/.test(req.headers.get('cookie') ?? ''))
