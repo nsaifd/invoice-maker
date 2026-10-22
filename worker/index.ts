@@ -6,6 +6,8 @@ import { ACCOUNT_SCHEMA, HttpError, handleAuth, handleSync } from './accounts'
 interface Env {
   DB: D1Database
   ASSETS: Fetcher
+  /** Marketing site. Visitors who aren't logged in are sent here from the home page. */
+  LANDING_URL?: string
 }
 
 type Kind = 'proposal' | 'invoice'
@@ -271,6 +273,10 @@ async function handleApi(req: Request, env: Env, path: string[]): Promise<Respon
 export default {
   async fetch(req, env): Promise<Response> {
     const url = new URL(req.url)
+    // The home page shows the marketing site to visitors without a session; logged-in people
+    // go straight to their dashboard. Every other page (login, share links…) works as usual.
+    if (url.pathname === '/' && env.LANDING_URL && !/(?:^|;\s*)involet_session=/.test(req.headers.get('cookie') ?? ''))
+      return new Response(null, { status: 302, headers: { location: env.LANDING_URL, 'cache-control': 'no-store' } })
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req)
     const parts = url.pathname.split('/').filter(Boolean) // ['api', 'shares', ...]
     try {
