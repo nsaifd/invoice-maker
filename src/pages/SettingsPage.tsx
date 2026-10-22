@@ -12,6 +12,7 @@ import { resizeImage } from '../lib/image'
 import { InvoicePreview } from '../components/InvoicePreview'
 import { FitToWidth } from '../components/doc'
 import { AccountSettings } from '../components/AccountSettings'
+import { SignatureField } from '../components/SignatureField'
 import { Button, Card, Field, NumberInput, PageHeader, inputCls } from '../components/ui'
 
 export default function SettingsPage() {
@@ -162,25 +163,12 @@ export default function SettingsPage() {
           <div className="mt-6 border-t border-zinc-100 pt-5">
             <div className="mb-3 text-sm font-medium text-zinc-700">Signature</div>
             <div className="flex flex-wrap items-center gap-4">
-              <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50">
-                {s.signature ? <img src={s.signature} alt="Signature" className="max-h-14 max-w-36 object-contain" /> : <span className="text-xs text-zinc-400">No signature</span>}
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="cursor-pointer text-sm font-medium text-blue-600 hover:underline">
-                  Upload signature
-                  <input type="file" accept="image/*" className="hidden" onChange={async (e) => e.target.files?.[0] && set({ signature: await resizeImage(e.target.files[0], 480) })} />
-                </label>
-                {s.signature && (
-                  <button type="button" className="text-left text-sm text-zinc-500 hover:text-red-600" onClick={() => set({ signature: undefined })}>
-                    Remove
-                  </button>
-                )}
-              </div>
+              <SignatureField value={s.signature} name={s.signatory || s.businessName} onChange={(signature) => set({ signature })} />
               <Field label="Name under signature" className="min-w-48 flex-1">
                 <input className={inputCls} placeholder={s.businessName || 'Your name'} {...text('signatory')} />
               </Field>
             </div>
-            <p className="mt-2 text-xs text-zinc-500">Tip: sign on white paper, take a photo, and upload a tightly cropped PNG.</p>
+            <p className="mt-2 text-xs text-zinc-500">Sign right here, or upload a photo of your signature on white paper (cropped tightly).</p>
           </div>
         </Card>
 

@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Calendar, Hash } from 'lucide-react'
-import { styleOf, bumpCounter, db, suggestNumber, useSettings, type Currency, type Invoice } from '../db'
+import { styleOf, bumpCounter, db, getSettings, suggestNumber, useSettings, type Currency, type Invoice } from '../db'
 import { CURRENCIES, newInvoice } from '../lib/invoice'
 import { LAYOUTS, PRESETS, applyPreset, presetById } from '../lib/presets'
 import { LineItemsEditor, ProductPicker } from '../components/LineItemsEditor'
@@ -10,6 +10,7 @@ import { ClientFields, ClientPicker } from '../components/ClientFields'
 import { ScaledPreview } from '../components/InvoicePreview'
 import { Button, Field, IconInput, PageHeader, SectionTitle, Toggle, inputCls } from '../components/ui'
 import { confirmLeave, useUnsavedGuard } from '../lib/unsaved'
+import { SignatureField } from '../components/SignatureField'
 
 const PREVIEW_KEY = 'invoicekit.showPreview'
 
@@ -196,6 +197,15 @@ export default function InvoiceEditor() {
               ))}
               {inv.style && inv.style.template !== 'custom' && !presetById(inv.style.preset) && <option value={inv.style.preset}>Custom</option>}
             </select>
+          </section>
+
+          <section className="p-6">
+            <SectionTitle title="Your Signature" subtitle="Saved to your profile and used on all your invoices and proposals." />
+            <SignatureField
+              value={settings.signature}
+              name={settings.signatory || settings.businessName}
+              onChange={async (signature) => db.settings.put({ ...(await getSettings()), signature, ...(signature ? { showSignature: true } : {}) })}
+            />
           </section>
 
           <section className="p-6">

@@ -8,6 +8,7 @@ import { region } from '../lib/locale'
 import { sampleInvoice } from '../lib/sample'
 import { InvoicePreview } from '../components/InvoicePreview'
 import { FitToWidth } from '../components/doc'
+import { SignatureField } from '../components/SignatureField'
 import { Button, Field, inputCls } from '../components/ui'
 
 /**
@@ -70,7 +71,10 @@ export default function WelcomePage() {
           <form onSubmit={save} className="mt-8 space-y-5">
             <div className="flex flex-wrap gap-4">
               <ImagePick label="Logo" value={s.logo} onPick={async (f) => set({ logo: await resizeImage(f, 480) })} onClear={() => set({ logo: undefined })} />
-              <ImagePick label="Signature" value={s.signature} onPick={async (f) => set({ signature: await resizeImage(f, 480) })} onClear={() => set({ signature: undefined })} />
+              <div>
+                <div className="mb-1.5 text-sm font-medium text-zinc-700">Signature</div>
+                <SignatureField value={s.signature} name={s.signatory || s.businessName} onChange={(signature) => set({ signature })} />
+              </div>
             </div>
             <Field label="Business name *">
               <input className={inputCls} placeholder="Ex. Acme Design Studio" autoFocus required {...text('businessName')} />
