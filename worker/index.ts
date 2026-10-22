@@ -8,7 +8,7 @@ interface Env {
   ASSETS: Fetcher
   /** Marketing site. Visitors who aren't logged in are sent here from the home page. */
   LANDING_URL?: string
-  /** The landing-page Worker, served on LANDING_URL's hostname through this Worker. */
+  /** The landing-page Worker, served on the home.* hostname through this Worker. */
   LANDING?: Fetcher
 }
 
@@ -30,7 +30,12 @@ document.addEventListener('click', function (e) {
 </script>`
 
 async function serveLanding(req: Request, env: Env, appOrigin: string): Promise<Response> {
-  const res = await env.LANDING!.fetch(req)
+  let res: Response
+  try {
+    res = await env.LANDING!.fetch(req)
+  } catch (e) {
+    return new Response(`Landing page is unavailable: ${(e as Error).message}`, { status: 502, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+  }
   if (!(res.headers.get('content-type') ?? '').includes('text/html')) return res
   return new HTMLRewriter().on('body', {
     element(body) {
@@ -302,9 +307,8 @@ async function handleApi(req: Request, env: Env, path: string[]): Promise<Respon
 export default {
   async fetch(req, env): Promise<Response> {
     const url = new URL(req.url)
-    const landing = env.LANDING_URL ? new URL(env.LANDING_URL) : null
     // home.involet.saifux.co is the landing page; its buttons lead to involet.saifux.co.
-    if (landing && env.LANDING && url.hostname === landing.hostname) return serveLanding(req, env, `${url.protocol}//${url.host.replace(/^home\./, '')}`)
+    if (env.LANDING && url.hostname.startsWith('home.')) return serveLanding(req, env, `${url.protocol}//${url.host.slice('home.'.length)}`)
     // The home page shows the marketing site to visitors without a session; logged-in people
     // go straight to their dashboard. Every other page (login, share links…) works as usual.
     if (url.pathname === '/' && env.LANDING_URL && !/(?:^|;\s*)involet_session=/.test(req.headers.get('cookie') ?? ''))
