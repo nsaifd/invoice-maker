@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Building2,
@@ -42,12 +42,20 @@ const menu: Array<{ to: string; label: string; icon: LucideIcon; end?: boolean }
  * working while offline.
  */
 export function Layout() {
+  return (
+    <RequireAccount>
+      <AppShell />
+    </RequireAccount>
+  )
+}
+
+export function RequireAccount({ children }: { children: ReactNode }) {
   const status = useSyncStatus()
   const location = useLocation()
   if (status.state === 'loading') return <Splash />
   if (!status.user && (status.state === 'signedOut' || !deviceHasAccount()))
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />
-  return <AppShell />
+  return children
 }
 
 function Splash() {
@@ -164,7 +172,11 @@ function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-zinc-200 pt-4">
+      <div className="mt-auto space-y-3 border-t border-zinc-200 pt-4">
+        <NavLink to="/settings" className={item}>
+          <Settings className="h-[18px] w-[18px]" />
+          Settings
+        </NavLink>
         <ProfileMenu />
       </div>
     </div>

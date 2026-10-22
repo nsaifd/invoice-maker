@@ -1,4 +1,4 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { cloneElement, isValidElement, useEffect, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, type LucideIcon } from 'lucide-react'
 import type { DisplayStatus } from '../lib/invoice'
@@ -9,13 +9,23 @@ export const inputCls =
   'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
 
 export function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
+  // Wrapping gives the field its name; an explicit for/id pair as well helps screen readers and audit tools that miss it.
+  const autoId = useId()
+  let htmlFor: string | undefined
+  if (isValidElement<{ id?: string }>(children) && LABELABLE.has(children.type as never)) {
+    htmlFor = children.props.id ?? autoId
+    if (!children.props.id) children = cloneElement(children, { id: htmlFor })
+  }
   return (
-    <label className={`block ${className}`}>
+    <label htmlFor={htmlFor} className={`block ${className}`}>
       <span className="mb-1.5 block text-sm font-medium text-zinc-700">{label}</span>
       {children}
     </label>
   )
 }
+
+// Field children that end up as the form control itself (custom ones pass `id` through).
+const LABELABLE = new Set<unknown>(['input', 'select', 'textarea', IconInput, NumberInput])
 
 /** Text input with a leading icon, as in the reference design. */
 export function IconInput({ icon: Icon, className = '', ...props }: InputHTMLAttributes<HTMLInputElement> & { icon: LucideIcon }) {

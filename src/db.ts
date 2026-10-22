@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable, type Table, type Transaction } from 'dexie'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { regionDefaults } from './lib/locale'
 
 export type Currency = 'BDT' | 'USD' | 'EUR' | 'GBP' | 'INR'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid'
@@ -407,9 +408,8 @@ export const defaultSettings: Settings = {
   website: '',
   address: '',
   signatory: '',
-  currency: 'BDT',
-  taxLabel: 'VAT',
-  taxRate: 15,
+  // Currency and tax follow the visitor's region (Taka and 15% VAT in Bangladesh).
+  ...regionDefaults(),
   invoicePrefix: 'INV-',
   nextNumber: 1,
   dueDays: 14,

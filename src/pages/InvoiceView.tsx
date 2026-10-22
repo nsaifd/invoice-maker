@@ -271,8 +271,8 @@ function RecurringModal({ open, onClose, invoice }: { open: boolean; onClose: ()
         </Field>
       </div>
       <p className="mt-4 rounded-lg bg-zinc-50 p-3 text-xs text-zinc-500">
-        A draft copy of this invoice is created on each date, with a new number. Because your data lives in this browser, invoices are created the next time you open Involet on or
-        after that date.
+        A draft copy of this invoice is created on each date, with a new number. It’s created the next time you open Involet (on any of your devices) on or after
+        that date.
       </p>
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>

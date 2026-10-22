@@ -5,7 +5,7 @@ import { addDays, calcTotals, newLineItem, todayISO, uid } from './invoice'
 
 export const BLOCKS: Record<BlockType, { label: string; description: string; icon: LucideIcon }> = {
   cover: { label: 'Cover', description: 'Title page with client and dates', icon: FileText },
-  text: { label: 'Text', description: 'About us, introduction, terms…', icon: AlignLeft },
+  text: { label: 'Text', description: 'Heading and paragraphs', icon: AlignLeft },
   scope: { label: 'Scope', description: 'Checklist of deliverables', icon: ListChecks },
   pricing: { label: 'Pricing', description: 'Line items with totals', icon: Receipt },
   timeline: { label: 'Timeline', description: 'Milestones and dates', icon: CalendarRange },
@@ -13,11 +13,12 @@ export const BLOCKS: Record<BlockType, { label: string; description: string; ico
 }
 
 /** Presets shown in the "Add block" menu. Several presets share a block type. */
-export const PRESETS: Array<{ key: string; label: string; type: BlockType; make: (s: Settings) => ProposalBlock }> = [
-  { key: 'cover', label: 'Cover page', type: 'cover', make: () => ({ id: uid(), type: 'cover', subtitle: '' }) },
+export const PRESETS: Array<{ key: string; label: string; description: string; type: BlockType; make: (s: Settings) => ProposalBlock }> = [
+  { key: 'cover', label: 'Cover page', description: 'Title page with client and dates', type: 'cover', make: () => ({ id: uid(), type: 'cover', subtitle: '' }) },
   {
     key: 'about',
     label: 'About us',
+    description: 'Who you are and why to choose you',
     type: 'text',
     make: (s) => ({
       id: uid(),
@@ -26,22 +27,25 @@ export const PRESETS: Array<{ key: string; label: string; type: BlockType; make:
       body: `${s.businessName || 'We'} help businesses grow with thoughtful, high-quality work.\n\nWhy work with us:\n- Clear communication and on-time delivery\n- Experienced team\n- Support after launch`,
     }),
   },
-  { key: 'text', label: 'Text section', type: 'text', make: () => ({ id: uid(), type: 'text', heading: 'Introduction', body: '' }) },
+  { key: 'text', label: 'Text section', description: 'A blank section with a heading', type: 'text', make: () => ({ id: uid(), type: 'text', heading: 'Introduction', body: '' }) },
   {
     key: 'scope',
     label: 'Scope of work',
+    description: 'Checklist of deliverables',
     type: 'scope',
     make: () => ({ id: uid(), type: 'scope', heading: 'Scope of Work', items: ['Discovery and planning', 'Design', 'Development', 'Testing and launch'] }),
   },
   {
     key: 'pricing',
     label: 'Pricing table',
+    description: 'Line items with totals',
     type: 'pricing',
     make: (s) => ({ id: uid(), type: 'pricing', heading: 'Investment', items: [newLineItem(s)], discountType: 'percent', discountValue: 0 }),
   },
   {
     key: 'timeline',
     label: 'Timeline',
+    description: 'Milestones and dates',
     type: 'timeline',
     make: () => ({
       id: uid(),
@@ -56,6 +60,7 @@ export const PRESETS: Array<{ key: string; label: string; type: BlockType; make:
   {
     key: 'terms',
     label: 'Terms & conditions',
+    description: 'Payment, revisions and validity',
     type: 'text',
     make: () => ({
       id: uid(),
@@ -67,6 +72,7 @@ export const PRESETS: Array<{ key: string; label: string; type: BlockType; make:
   {
     key: 'signature',
     label: 'Signature',
+    description: 'Acceptance and signatures',
     type: 'signature',
     make: () => ({ id: uid(), type: 'signature', heading: 'Acceptance', body: 'By signing below, you accept this proposal and its terms.' }),
   },

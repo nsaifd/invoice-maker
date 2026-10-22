@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Check, Cloud, Copy, Download, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, ShieldCheck, WifiOff } from 'lucide-react'
-import { db } from '../db'
+import { db, getSettings } from '../db'
 import { login, passwordProblem, recover, signup, type User } from '../lib/auth'
 import { onSignedIn, useSyncStatus } from '../lib/sync'
 import { Button, Field, IconInput, inputCls } from '../components/ui'
@@ -26,7 +26,9 @@ export default function AuthPage({ mode }: { mode: Mode }) {
   async function finish(user: User) {
     setBusy(localCount ? 'Uploading your data…' : 'Getting your data…')
     await onSignedIn(user)
-    navigate(from, { replace: true })
+    // A new workspace (or one never set up) is asked for its business details first.
+    const s = await getSettings()
+    navigate(s.businessName.trim() ? from : '/welcome', { replace: true, state: { from } })
   }
 
   // Already logged in: open the app.

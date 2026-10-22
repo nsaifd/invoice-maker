@@ -9,6 +9,7 @@ import { LineItemsEditor, ProductPicker } from '../components/LineItemsEditor'
 import { ClientFields, ClientPicker } from '../components/ClientFields'
 import { ScaledPreview } from '../components/InvoicePreview'
 import { Button, Field, IconInput, PageHeader, SectionTitle, Toggle, inputCls } from '../components/ui'
+import { confirmLeave, useUnsavedGuard } from '../lib/unsaved'
 
 const PREVIEW_KEY = 'invoicekit.showPreview'
 
@@ -22,6 +23,8 @@ export default function InvoiceEditor() {
   const [inv, setInv] = useState<Invoice | null>(null)
   const [saveClient, setSaveClient] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  useUnsavedGuard(dirty && !saving)
   const [showPreview, setShowPreview] = useState(() => {
     try {
       return localStorage.getItem(PREVIEW_KEY) !== '0'
@@ -47,7 +50,10 @@ export default function InvoiceEditor() {
 
   if (!settings || !inv) return null
 
-  const set = (patch: Partial<Invoice>) => setInv((v) => v && { ...v, ...patch })
+  const set = (patch: Partial<Invoice>) => {
+    setInv((v) => v && { ...v, ...patch })
+    setDirty(true)
+  }
 
   function togglePreview(v: boolean) {
     setShowPreview(v)
@@ -89,11 +95,11 @@ export default function InvoiceEditor() {
       <PageHeader
         crumbs={[{ label: 'Invoices', to: '/' }, { label: inv.id ? 'Edit Invoice' : 'New Invoice' }]}
         title={inv.id ? `Edit ${inv.number}` : 'New Invoice'}
-        subtitle={inv.id ? 'Update the details and save your changes.' : 'Create a new invoice and download it as a PDF.'}
+        subtitle={inv.id ? 'Update the details and save your changes.' : 'Create an invoice, then share a link or download a PDF.'}
         actions={
           <>
             <Toggle label="Show Preview" checked={showPreview} onChange={togglePreview} />
-            <Button variant="secondary" onClick={() => navigate(-1)}>
+            <Button variant="secondary" onClick={() => confirmLeave(dirty) && navigate(-1)}>
               Cancel
             </Button>
             <Button onClick={save} disabled={saving}>

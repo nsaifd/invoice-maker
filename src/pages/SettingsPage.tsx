@@ -3,10 +3,12 @@ import { Link, useLocation } from 'react-router-dom'
 import { Palette } from 'lucide-react'
 import { SYNC_TABLES, db, defaultSettings, useSettings, type Currency, type PaymentDetails, type Settings } from '../db'
 import { CURRENCIES } from '../lib/invoice'
+import { region } from '../lib/locale'
 import { remapLegacy, writeAll } from '../lib/migrate'
 import { FONTS } from '../lib/fonts'
 import { PRESETS, layoutLabel, presetById } from '../lib/presets'
 import { sampleInvoice } from '../lib/sample'
+import { resizeImage } from '../lib/image'
 import { InvoicePreview } from '../components/InvoicePreview'
 import { FitToWidth } from '../components/doc'
 import { AccountSettings } from '../components/AccountSettings'
@@ -258,9 +260,14 @@ export default function SettingsPage() {
             <Field label="Branch"><input className={inputCls} {...pay('branch')} /></Field>
             <Field label="Routing number"><input className={inputCls} {...pay('routingNumber')} /></Field>
             <Field label="SWIFT code"><input className={inputCls} {...pay('swift')} /></Field>
-            <Field label="bKash"><input className={inputCls} placeholder="01XXXXXXXXX (Personal/Merchant)" {...pay('bkash')} /></Field>
-            <Field label="Nagad"><input className={inputCls} {...pay('nagad')} /></Field>
-            <Field label="Rocket"><input className={inputCls} {...pay('rocket')} /></Field>
+            {/* Mobile wallets are a Bangladesh thing; shown there, or if already filled in. */}
+            {(region(s.currency).wallets || s.payment.bkash || s.payment.nagad || s.payment.rocket) && (
+              <>
+                <Field label="bKash"><input className={inputCls} placeholder="01XXXXXXXXX (Personal/Merchant)" {...pay('bkash')} /></Field>
+                <Field label="Nagad"><input className={inputCls} {...pay('nagad')} /></Field>
+                <Field label="Rocket"><input className={inputCls} {...pay('rocket')} /></Field>
+              </>
+            )}
             <Field label="Other instructions" className="sm:col-span-2">
               <textarea rows={2} className={inputCls} placeholder="PayPal, Payoneer, Wise…" {...pay('other')} />
             </Field>
@@ -270,7 +277,7 @@ export default function SettingsPage() {
         <Card>
           <h2 className="mb-1 font-semibold">Backup & restore</h2>
           <p className="mb-4 text-sm text-zinc-500">
-            Your data is stored only in this browser. Export a backup regularly, and use it to move your data to another device or browser.
+            Your data syncs to your account automatically. You can also download a copy of everything as a file, or restore one.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={exportData}>Export backup (.json)</Button>
@@ -283,23 +290,4 @@ export default function SettingsPage() {
       </div>
     </>
   )
-}
-
-/** Downscales an uploaded logo so it stays small inside IndexedDB and backups. */
-function resizeImage(file: File, max: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      const scale = Math.min(1, max / Math.max(img.width, img.height))
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.round(img.width * scale)
-      canvas.height = Math.round(img.height * scale)
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-      URL.revokeObjectURL(url)
-      resolve(canvas.toDataURL('image/png'))
-    }
-    img.onerror = () => reject(new Error('Could not read image'))
-    img.src = url
-  })
 }

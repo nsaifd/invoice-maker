@@ -14,6 +14,7 @@ import { LineItemsEditor, ProductPicker } from '../components/LineItemsEditor'
 import { ProposalDocument } from '../components/ProposalDocument'
 import { ScaledFrame } from '../components/doc'
 import { Button, Field, IconInput, PageHeader, SectionTitle, Toggle, inputCls } from '../components/ui'
+import { confirmLeave, useUnsavedGuard } from '../lib/unsaved'
 
 const PREVIEW_KEY = 'invoicekit.showPreview'
 
@@ -27,6 +28,8 @@ export default function ProposalEditor() {
   const [doc, setDoc] = useState<Proposal | null>(null)
   const [saveClient, setSaveClient] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  useUnsavedGuard(dirty && !saving)
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [showPreview, setShowPreview] = useState(() => {
     try {
@@ -49,9 +52,14 @@ export default function ProposalEditor() {
 
   if (!settings || !doc) return null
 
-  const set = (patch: Partial<Proposal>) => setDoc((v) => v && { ...v, ...patch })
-  const setBlock = (bid: string, patch: Partial<ProposalBlock>) =>
+  const set = (patch: Partial<Proposal>) => {
+    setDoc((v) => v && { ...v, ...patch })
+    setDirty(true)
+  }
+  const setBlock = (bid: string, patch: Partial<ProposalBlock>) => {
     setDoc((v) => v && { ...v, blocks: v.blocks.map((b) => (b.id === bid ? ({ ...b, ...patch } as ProposalBlock) : b)) })
+    setDirty(true)
+  }
   const locked = doc.status === 'accepted'
 
   function togglePreview(v: boolean) {
@@ -98,11 +106,11 @@ export default function ProposalEditor() {
       <PageHeader
         crumbs={[{ label: 'Proposals', to: '/proposals' }, { label: doc.id ? 'Edit Proposal' : 'New Proposal' }]}
         title={doc.id ? `Edit ${doc.number}` : 'New Proposal'}
-        subtitle="Build your proposal from blocks — drag the handle to reorder."
+        subtitle="Build it from blocks, then share a link your client can sign online."
         actions={
           <>
             <Toggle label="Show Preview" checked={showPreview} onChange={togglePreview} />
-            <Button variant="secondary" onClick={() => navigate(-1)}>
+            <Button variant="secondary" onClick={() => confirmLeave(dirty) && navigate(-1)}>
               Cancel
             </Button>
             <Button onClick={save} disabled={saving}>
@@ -468,7 +476,7 @@ function AddBlockMenu({ onAdd }: { onAdd: (make: (s: Settings) => ProposalBlock)
                 </span>
                 <span>
                   <span className="block text-sm font-medium text-zinc-900">{p.label}</span>
-                  <span className="block text-xs text-zinc-500">{BLOCKS[p.type].description}</span>
+                  <span className="block text-xs text-zinc-500">{p.description}</span>
                 </span>
               </button>
             )

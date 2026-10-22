@@ -26,6 +26,7 @@ import { A4, DEFAULT_MARGINS, ZONES, autoPlace, blankTemplate, newZone, readDesi
 import { FONTS, fontStack, loadFont } from '../lib/fonts'
 import { uid } from '../lib/invoice'
 import { newProposal } from '../lib/proposal'
+import { region } from '../lib/locale'
 import { sampleInvoice } from '../lib/sample'
 import { ZoneContent, zoneBox, type ZoneData } from '../components/CustomDesign'
 import { ProposalDocument } from '../components/ProposalDocument'
@@ -187,7 +188,7 @@ function Designer({
 
   const data: ZoneData = useMemo(() => {
     if (isProposal) {
-      const p = latestProposal ?? { ...newProposal(settings), title: 'Website Redesign Proposal', client: { name: 'Rahim Ahmed', company: 'Rahim Traders Ltd.', email: 'rahim@example.com', phone: '', address: '' } }
+      const p = latestProposal ?? { ...newProposal(settings), title: 'Website Redesign Proposal', client: { ...region(settings.currency).sampleClient, phone: '', address: '' } }
       return { s: settings, proposal: p }
     }
     return { s: settings, invoice: latestInvoice ? { ...latestInvoice, style: undefined } : sampleInvoice(settings) }

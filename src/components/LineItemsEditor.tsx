@@ -50,7 +50,7 @@ export function LineItemsEditor({
                 value={item.description}
                 onChange={(e) => setItem(i, { description: e.target.value })}
               />
-              <NumInput label="Qty" allowNegative value={item.qty} onChange={(qty) => setItem(i, { qty })} />
+              <NumInput label="Qty" value={item.qty} onChange={(qty) => setItem(i, { qty })} />
               <NumInput label="Rate" allowNegative value={item.rate} onChange={(rate) => setItem(i, { rate })} />
               <NumInput label={`${taxLabel} %`} max={100} value={item.taxRate} onChange={(taxRate) => setItem(i, { taxRate })} />
               <div className="col-span-3 @md:col-span-1">
@@ -158,7 +158,7 @@ export function ProductPicker({
   )
 }
 
-// Negative qty or rate makes a credit line (refund, deposit already paid).
+// Quantity can't go below 0. A negative rate makes a credit line (refund, advance already paid).
 function NumInput({ label, value, onChange, ...limits }: { label: string; value: number; onChange: (n: number) => void; allowNegative?: boolean; max?: number }) {
   return (
     <label>

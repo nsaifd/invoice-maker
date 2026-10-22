@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './index.css'
-import { Layout } from './components/Layout'
+import { Layout, RequireAccount } from './components/Layout'
 import InvoicesPage from './pages/InvoicesPage'
 import InvoiceEditor from './pages/InvoiceEditor'
 import InvoiceView from './pages/InvoiceView'
@@ -17,6 +17,7 @@ import PublicPage from './pages/PublicPage'
 import TemplatesPage from './pages/TemplatesPage'
 import TemplateDesigner from './pages/TemplateDesigner'
 import AuthPage from './pages/AuthPage'
+import WelcomePage from './pages/WelcomePage'
 import { ready } from './lib/migrate'
 import { initSync } from './lib/sync'
 
@@ -34,6 +35,14 @@ ready.then(() => {
           <Route path="login" element={<AuthPage mode="login" />} />
           <Route path="signup" element={<AuthPage mode="signup" />} />
           <Route path="recover" element={<AuthPage mode="recover" />} />
+          <Route
+            path="welcome"
+            element={
+              <RequireAccount>
+                <WelcomePage />
+              </RequireAccount>
+            }
+          />
           <Route element={<Layout />}>
             <Route index element={<InvoicesPage />} />
             <Route path="invoices/new" element={<InvoiceEditor />} />

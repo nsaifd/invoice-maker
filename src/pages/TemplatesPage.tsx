@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Check, Copy, FileSignature, FileText, PenTool, RotateCcw, Save, Star, Trash2, Upload } from 'lucide-react'
 import { db, styleOf, useSettings, type CoverStyle, type CustomTemplate, type DocStyle, type FontId, type HeadingStyle, type Invoice, type Proposal, type ProposalTheme, type Settings, type TemplateId } from '../db'
 import { newProposal } from '../lib/proposal'
+import { region } from '../lib/locale'
 import { COVERS, HEADINGS, THEMES, applyTheme, themeById, type ThemePreset } from '../lib/proposalThemes'
 import { ProposalDocument } from '../components/ProposalDocument'
 import { FONTS, loadFont } from '../lib/fonts'
@@ -382,8 +383,14 @@ function sampleProposal(s: Settings, latest?: Proposal | null): Proposal {
   return {
     ...p,
     title: 'E-commerce Website Redesign',
-    client: { name: 'Rahim Ahmed', company: 'Rahim Traders Ltd.', email: 'rahim@example.com', phone: '', address: '' },
-    blocks: p.blocks.map((b) => (b.type === 'cover' ? { ...b, subtitle: 'A faster, mobile-first store that turns visitors into customers.' } : b.type === 'pricing' ? { ...b, items: [{ ...b.items[0], description: 'Design & development', rate: 120000 }] } : b)),
+    client: { ...region(s.currency).sampleClient, phone: '', address: '' },
+    blocks: p.blocks.map((b) =>
+      b.type === 'cover'
+        ? { ...b, subtitle: 'A faster, mobile-first store that turns visitors into customers.' }
+        : b.type === 'pricing'
+          ? { ...b, items: [{ ...b.items[0], description: 'Design & development', rate: region(s.currency).sampleItems[0].rate * 2 }] }
+          : b,
+    ),
   }
 }
 

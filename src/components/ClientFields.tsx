@@ -1,13 +1,15 @@
 import { Building2, ChevronDown, Mail, Phone, User } from 'lucide-react'
-import { emptyClient, type Client, type ClientInfo } from '../db'
+import { defaultSettings, emptyClient, useSettings, type Client, type ClientInfo } from '../db'
+import { region } from '../lib/locale'
 import { Field, IconInput, initials, inputCls } from './ui'
 
 export function ClientFields({ value, onChange }: { value: ClientInfo; onChange: (v: ClientInfo) => void }) {
+  const ph = region(useSettings()?.currency ?? defaultSettings.currency).placeholder
   const set = (k: keyof ClientInfo) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange({ ...value, [k]: e.target.value })
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Full Name *">
-        <IconInput icon={User} placeholder="Ex. Rahim Ahmed" value={value.name} onChange={set('name')} />
+        <IconInput icon={User} placeholder={ph.name} value={value.name} onChange={set('name')} />
       </Field>
       <Field label="Company">
         <IconInput icon={Building2} placeholder="Ex. Acme Corp" value={value.company} onChange={set('company')} />
@@ -16,10 +18,10 @@ export function ClientFields({ value, onChange }: { value: ClientInfo; onChange:
         <IconInput icon={Mail} type="email" placeholder="name@company.com" value={value.email} onChange={set('email')} />
       </Field>
       <Field label="Phone">
-        <IconInput icon={Phone} placeholder="+880 1XXX-XXXXXX" value={value.phone} onChange={set('phone')} />
+        <IconInput icon={Phone} placeholder={ph.phone} value={value.phone} onChange={set('phone')} />
       </Field>
       <Field label="Address" className="sm:col-span-2">
-        <textarea rows={2} className={inputCls} placeholder="Ex. 123 Road, Dhanmondi, Dhaka" value={value.address} onChange={set('address')} />
+        <textarea rows={2} className={inputCls} placeholder={ph.address} value={value.address} onChange={set('address')} />
       </Field>
     </div>
   )
