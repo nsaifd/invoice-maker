@@ -19,9 +19,8 @@
   // The marketing site is its own Worker; it's served on home.involet.saifux.co through this one.
   "services": [{ "binding": "LANDING", "service": "black-sunset-577c" }],
   "vars": {
-    // Where visitors without an account land. When home.involet.saifux.co is attached to this
-    // Worker (Settings → Domains & Routes), set this to https://home.involet.saifux.co.
-    "LANDING_URL": "https://black-sunset-577c.connect-saifd.workers.dev"
+    // Where visitors without an account land (home.involet.saifux.co is attached to this Worker).
+    "LANDING_URL": "https://home.involet.saifux.co"
   },
   // No database_id: Wrangler creates the D1 database automatically on first deploy.
   "d1_databases": [{ "binding": "DB", "database_name": "invoice-maker-db" }]
