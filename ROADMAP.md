@@ -4,7 +4,7 @@ Limit: shudhu Cloudflare-er free service, kono third-party API na, online paymen
 
 ## Top priority (shuru korbo egulo diye)
 
-- [ ] **Payment record, partial payment, receipt**
+- [~] **Payment record, partial payment, receipt** — client reports payment from the link, owner confirms, partial payments (2026-10-23). Baki: owner nije haate payment jog kora, alada receipt PDF.
   - Advance, kisti ar baki taka track kora (jemon ৳50,000-er moddhe ৳20,000 bKash-e paoa gechhe).
   - Prottek payment-er jonno auto receipt, ar invoice-e "Balance Due".
 - [ ] **Bangla invoice**
@@ -43,3 +43,5 @@ Limit: shudhu Cloudflare-er free service, kono third-party API na, online paymen
 - [x] Account ar cloud sync (shob device-e)
 - [x] Number/amount bug fix (2026-10-21)
 - [x] Login-first flow ar ekta profile menu (2026-10-22)
+- [x] Landing page home.involet.saifux.co-te (2026-10-22)
+- [x] Invoice link-e client confirm, "I've paid" (TrxID, screenshot), owner review (2026-10-23)
