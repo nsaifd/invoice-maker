@@ -1,11 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertCircle, BellRing, CheckCircle2, Clock, FileText, Mail, MessageCircle, Plus, Search, type LucideIcon } from 'lucide-react'
+import { AlertCircle, BellRing, CheckCircle2, Clock, FileText, Mail, MessageCircle, Plus, Search, Wallet, type LucideIcon } from 'lucide-react'
 import { db, useSettings, type Currency } from '../db'
-import { addDays, calcTotals, displayStatus, formatDate, formatMoney, todayISO, type DisplayStatus } from '../lib/invoice'
+import { addDays, calcTotals, displayStatus, formatDate, formatMoney, toCents, todayISO, type DisplayStatus } from '../lib/invoice'
 import { openReminder } from '../lib/recurring'
-import { shareUrl, timeAgo } from '../lib/share'
+import { shareUrl, timeAgo, useInvoiceInbox } from '../lib/share'
 import { PageHeader, StatusBadge, initials, inputCls } from '../components/ui'
 
 const filters: Array<'all' | DisplayStatus> = ['all', 'draft', 'sent', 'overdue', 'paid']
@@ -17,6 +17,8 @@ export default function InvoicesPage() {
   const [filter, setFilter] = useState<(typeof filters)[number]>('all')
   const [q, setQ] = useState(params.get('q') ?? '')
   const navigate = useNavigate()
+
+  const inbox = useInvoiceInbox(invoices)
 
   // Sidebar search navigates here with ?q=
   useEffect(() => setQ(params.get('q') ?? ''), [params])
@@ -41,6 +43,9 @@ export default function InvoicesPage() {
   }
   const count = (n: number) => `${n} invoice${n === 1 ? '' : 's'}`
 
+  // Payments clients reported from the invoice link, waiting for you to confirm.
+  const reported = rows.flatMap((r) => (inbox[r.inv.share?.id ?? '']?.payments ?? []).filter((p) => p.status === 'pending').map((p) => ({ ...r, payment: p })))
+  const hasReport = (inv: (typeof rows)[number]['inv']) => reported.some((r) => r.inv.id === inv.id)
   const soon = addDays(todayISO(), 3)
   const attention = rows.filter((r) => r.status === 'overdue' || (r.status === 'sent' && r.inv.dueDate <= soon)).sort((a, b) => a.inv.dueDate.localeCompare(b.inv.dueDate))
 
@@ -82,6 +87,33 @@ export default function InvoicesPage() {
         <Stat icon={AlertCircle} label="Overdue" value={formatMoney(sum(overdue), cur)} extra={others(overdue)} sub={count(overdue.length)} tone="red" />
         <Stat icon={CheckCircle2} label="Paid this month" value={formatMoney(sum(paidMonth), cur)} extra={others(paidMonth)} sub={count(paidMonth.length)} tone="green" />
       </div>
+
+      {reported.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/50">
+          <div className="flex items-center gap-2 px-5 pt-4 font-semibold text-zinc-900">
+            <Wallet className="h-4 w-4 text-emerald-600" /> Payments to confirm
+            <span className="text-xs font-normal text-zinc-500">your clients say they’ve paid</span>
+          </div>
+          <div className="divide-y divide-emerald-100 px-5 pb-2">
+            {reported.slice(0, 6).map(({ inv, payment: p }) => (
+              <div key={`${inv.id}-${p.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 text-sm">
+                <Link to={`/invoices/${inv.id}`} className="min-w-40 flex-1">
+                  <span className="font-medium text-zinc-900">{p.name}</span>
+                  <span className="ml-2 text-zinc-500">{inv.number}</span>
+                  <span className="block text-xs text-emerald-700">
+                    Paid via {p.method} on {formatDate(p.paidOn)}
+                    {p.reference && <span className="font-mono text-zinc-500"> · {p.reference}</span>}
+                  </span>
+                </Link>
+                <span className="font-semibold text-zinc-900">{formatMoney(toCents(p.amount), inv.currency)}</span>
+                <Link to={`/invoices/${inv.id}`} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700">
+                  Review
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {attention.length > 0 && (
         <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50/40">
@@ -181,6 +213,7 @@ export default function InvoicesPage() {
                     <td className="whitespace-nowrap px-4 py-3.5 text-zinc-500">{formatDate(inv.dueDate)}</td>
                     <td className="px-4 py-3.5">
                       <StatusBadge status={status} />
+                      {hasReport(inv) && <span className="ml-1.5 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Payment reported</span>}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold text-zinc-900">{formatMoney(total, inv.currency)}</td>
                   </tr>

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { CheckCircle2, Download, FileX, MessageCircle, PenLine, Send, XCircle } from 'lucide-react'
+import { CheckCircle2, Download, FileX, MessageCircle, PenLine, Send, Wallet, XCircle } from 'lucide-react'
 import { db, type Settings } from '../db'
 import { calcTotals, formatDate, formatMoney } from '../lib/invoice'
 import { proposalTotal } from '../lib/proposal'
-import { acceptShare, declineShare, fetchShare, postComment, sendEvents, type PublicShare } from '../lib/share'
+import { acceptShare, confirmInvoice, declineShare, fetchShare, postComment, reportPayment, sendEvents, type PublicShare } from '../lib/share'
+import { ConfirmInvoiceModal, HowToPay, InvoiceBanner, InvoiceSummary, ReportPaymentModal, invoiceView } from '../components/PublicInvoice'
 import { InvoicePreview } from '../components/InvoicePreview'
 import { ProposalDocument } from '../components/ProposalDocument'
 import { PrintPortal, ScaledFrame } from '../components/doc'
@@ -35,7 +36,7 @@ export default function PublicPage() {
   const [data, setData] = useState<PublicShare | null>(null)
   const [error, setError] = useState('')
   const [isOwner, setIsOwner] = useState<boolean | null>(null)
-  const [modal, setModal] = useState<'accept' | 'decline' | null>(null)
+  const [modal, setModal] = useState<'accept' | 'decline' | 'pay' | 'confirm' | null>(null)
   const docRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -69,10 +70,11 @@ export default function PublicPage() {
   const settings = { ...data.doc.settings, id: 'default', nextNumber: 0, nextProposalNumber: 0 } as Settings
   const { proposal, invoice } = data.doc
   const custom = data.doc.customTemplate ?? null
+  const inv = invoice && invoiceView(invoice, data.invoice)
   const doc = proposal ? (
     <ProposalDocument proposal={proposal} settings={settings} acceptance={data.acceptance} customTemplate={custom} />
-  ) : invoice ? (
-    <InvoicePreview invoice={invoice} settings={settings} customTemplate={custom} />
+  ) : inv ? (
+    <InvoicePreview invoice={inv.shown} settings={settings} customTemplate={custom} />
   ) : null
   const total = proposal ? formatMoney(proposalTotal(proposal), proposal.currency) : invoice ? formatMoney(calcTotals(invoice).total, invoice.currency) : ''
   const canRespond = data.kind === 'proposal' && data.status === 'open'
@@ -92,6 +94,11 @@ export default function PublicPage() {
           <Button variant="secondary" icon={Download} onClick={download}>
             <span className="hidden sm:inline">Download PDF</span>
           </Button>
+          {inv && !inv.paid && isOwner === false && (
+            <Button icon={Wallet} onClick={() => setModal('pay')}>
+              I’ve paid
+            </Button>
+          )}
           {canRespond && (
             <>
               <Button variant="secondary" icon={XCircle} onClick={() => setModal('decline')} className="hidden sm:inline-flex">
@@ -118,6 +125,7 @@ export default function PublicPage() {
           </span>
         </div>
       )}
+      {inv && <InvoiceBanner view={inv} currency={invoice!.currency} business={settings.businessName} />}
       {data.status === 'declined' && data.decline && (
         <div className="mb-4 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <XCircle className="h-5 w-5 shrink-0" />
@@ -132,25 +140,39 @@ export default function PublicPage() {
           <ScaledFrame>{doc}</ScaledFrame>
         </div>
         <aside className="space-y-4 lg:sticky lg:top-20">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-5">
-            <div className="text-sm text-zinc-500">{proposal ? 'Proposal total' : 'Amount due'}</div>
-            <div className="text-2xl font-semibold tracking-tight text-zinc-900">{invoice?.status === 'paid' ? 'Paid' : total}</div>
-            <dl className="mt-3 space-y-1 text-sm">
-              {proposal && <Row label="Valid until" value={formatDate(proposal.validUntil)} />}
-              {invoice && <Row label="Due date" value={formatDate(invoice.dueDate)} />}
-              <Row label="From" value={settings.businessName} />
-            </dl>
-            {canRespond && (
-              <div className="mt-4 grid gap-2">
-                <Button icon={PenLine} onClick={() => setModal('accept')}>
-                  Accept & Sign
-                </Button>
-                <Button variant="secondary" icon={XCircle} onClick={() => setModal('decline')}>
-                  Decline
-                </Button>
-              </div>
-            )}
-          </div>
+          {invoice && inv ? (
+            <>
+              <InvoiceSummary
+                invoice={invoice}
+                settings={settings}
+                view={inv}
+                state={data.invoice ?? { confirmation: null, payments: [], paid: null, marked: false }}
+                isOwner={!!isOwner}
+                onPay={() => setModal('pay')}
+                onConfirm={() => setModal('confirm')}
+              />
+              {!inv.paid && <HowToPay settings={settings} />}
+            </>
+          ) : (
+            <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+              <div className="text-sm text-zinc-500">Proposal total</div>
+              <div className="text-2xl font-semibold tracking-tight text-zinc-900">{total}</div>
+              <dl className="mt-3 space-y-1 text-sm">
+                {proposal && <Row label="Valid until" value={formatDate(proposal.validUntil)} />}
+                <Row label="From" value={settings.businessName} />
+              </dl>
+              {canRespond && (
+                <div className="mt-4 grid gap-2">
+                  <Button icon={PenLine} onClick={() => setModal('accept')}>
+                    Accept & Sign
+                  </Button>
+                  <Button variant="secondary" icon={XCircle} onClick={() => setModal('decline')}>
+                    Decline
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
           <PublicComments id={id} comments={data.comments} onChange={(comments) => setData({ ...data, comments })} />
         </aside>
       </div>
@@ -177,6 +199,37 @@ export default function PublicPage() {
           setModal(null)
         }}
       />
+      {invoice && inv && (
+        <>
+          <ReportPaymentModal
+            key={`pay-${modal === 'pay'}`}
+            open={modal === 'pay'}
+            onClose={() => setModal(null)}
+            settings={settings}
+            currency={invoice.currency}
+            due={inv.due}
+            defaultName={storage(NAME_KEY) || invoice.client.name}
+            onSubmit={async (body) => {
+              const r = await reportPayment(id, body)
+              storage(NAME_KEY, body.name)
+              setData({ ...data, invoice: r.invoice })
+              setModal(null)
+            }}
+          />
+          <ConfirmInvoiceModal
+            open={modal === 'confirm'}
+            onClose={() => setModal(null)}
+            total={formatMoney(inv.total, invoice.currency)}
+            defaultName={storage(NAME_KEY) || invoice.client.name}
+            onSubmit={async (body) => {
+              const r = await confirmInvoice(id, body)
+              storage(NAME_KEY, body.name)
+              setData({ ...data, invoice: r.invoice })
+              setModal(null)
+            }}
+          />
+        </>
+      )}
       <PrintPortal>{doc}</PrintPortal>
     </Shell>
   )

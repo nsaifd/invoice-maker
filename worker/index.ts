@@ -52,6 +52,8 @@ const MAX_DOC_BYTES = 1_900_000
 const MAX_SIGNATURE_BYTES = 300_000
 const MAX_EVENTS_PER_SHARE = 5000
 const MAX_COMMENTS_PER_SHARE = 200
+const MAX_PAYMENT_REPORTS = 20
+const MAX_PROOF_BYTES = 450_000
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shares (
@@ -86,6 +88,16 @@ const SCHEMA = [
     at INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS comments_share ON comments (share_id, at)`,
+  // What happened to a shared invoice: the client confirming it or reporting a payment, and the
+  // owner confirming/rejecting a payment or marking the invoice paid/unpaid. Append-only.
+  `CREATE TABLE IF NOT EXISTS share_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    share_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    data TEXT NOT NULL,
+    at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS share_actions_share ON share_actions (share_id, id)`,
 ]
 
 let schemaReady: Promise<unknown> | null = null
@@ -158,6 +170,60 @@ async function listComments(env: Env, id: string) {
   return results
 }
 
+type ActionType = 'confirm' | 'payment' | 'payment_ok' | 'payment_rejected' | 'paid' | 'unpaid'
+interface ActionRow {
+  id: number
+  share_id: string
+  type: ActionType
+  data: string
+  at: number
+}
+
+export interface PaymentReport {
+  id: number
+  name: string
+  method: string
+  amount: number
+  reference: string
+  paidOn: string
+  note: string
+  hasProof: boolean
+  at: number
+  status: 'pending' | 'confirmed' | 'rejected'
+  reason?: string
+}
+
+/** The invoice's state for both sides, folded from its action log. */
+function invoiceState(actions: ActionRow[]) {
+  let confirmation: { name: string; note: string; at: number } | null = null
+  let paid: { paidOn: string; at: number } | null = null
+  // Whether the owner has set paid/unpaid here; if not, the shared invoice's own status applies.
+  let marked = false
+  const payments = new Map<number, PaymentReport>()
+  for (const a of actions) {
+    const d = JSON.parse(a.data)
+    if (a.type === 'confirm') confirmation = { name: d.name, note: d.note ?? '', at: a.at }
+    else if (a.type === 'payment')
+      payments.set(a.id, { id: a.id, name: d.name, method: d.method, amount: d.amount, reference: d.reference, paidOn: d.paidOn, note: d.note, hasProof: !!d.proof, at: a.at, status: 'pending' })
+    else if (a.type === 'payment_ok' || a.type === 'payment_rejected') {
+      const p = payments.get(d.paymentId)
+      if (p) Object.assign(p, { status: a.type === 'payment_ok' ? 'confirmed' : 'rejected', reason: d.reason || undefined })
+    } else if (a.type === 'paid') [paid, marked] = [{ paidOn: d.paidOn, at: a.at }, true]
+    else if (a.type === 'unpaid') [paid, marked] = [null, true]
+  }
+  return { confirmation, payments: [...payments.values()], paid, marked }
+}
+
+async function listActions(env: Env, id: string) {
+  const { results } = await env.DB.prepare('SELECT * FROM share_actions WHERE share_id = ? ORDER BY id').bind(id).all<ActionRow>()
+  return results
+}
+
+const addAction = (env: Env, id: string, type: ActionType, data: unknown, at: number) =>
+  env.DB.prepare('INSERT INTO share_actions (share_id, type, data, at) VALUES (?, ?, ?, ?)').bind(id, type, JSON.stringify(data), at).run()
+
+const isoDate = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '')
+
 async function handleApi(req: Request, env: Env, path: string[]): Promise<Response> {
   await ensureSchema(env.DB)
   const method = req.method
@@ -176,7 +242,28 @@ async function handleApi(req: Request, env: Env, path: string[]): Promise<Respon
     return json({ id, ownerKey }, 201)
   }
 
-  const [id, action] = path
+  // POST /api/shares/inbox — the owner's app asks which shared invoices have news (in one request).
+  if (path[0] === 'inbox' && path.length === 1 && method === 'POST') {
+    const body = await readJson<{ shares?: Array<{ id?: string; ownerKey?: string }> }>(req, 20_000)
+    const asked = (body.shares ?? []).filter((x) => typeof x.id === 'string' && typeof x.ownerKey === 'string').slice(0, 90) // D1 allows 100 bound values
+    if (!asked.length) return json({ shares: {} })
+    const marks = asked.map(() => '?').join(',')
+    const ids = asked.map((x) => x.id!)
+    const [owners, acts] = await env.DB.batch([
+      env.DB.prepare(`SELECT id, owner_key FROM shares WHERE id IN (${marks})`).bind(...ids),
+      env.DB.prepare(`SELECT * FROM share_actions WHERE share_id IN (${marks}) ORDER BY id`).bind(...ids),
+    ])
+    const keys = new Map((owners.results as Array<{ id: string; owner_key: string }>).map((r) => [r.id, r.owner_key]))
+    const out: Record<string, ReturnType<typeof invoiceState>> = {}
+    for (const x of asked) {
+      const key = keys.get(x.id!)
+      if (!key || !sameKey(key, x.ownerKey!)) continue
+      out[x.id!] = invoiceState((acts.results as unknown as ActionRow[]).filter((a) => a.share_id === x.id))
+    }
+    return json({ shares: out })
+  }
+
+  const [id, action, sub] = path
   if (!id) throw new HttpError(404, 'Not found')
   const row = await getShare(env, id)
 
@@ -191,6 +278,7 @@ async function handleApi(req: Request, env: Env, path: string[]): Promise<Respon
         acceptance: acceptance && { name: acceptance.name, signature: acceptance.signature, signedAt: acceptance.signedAt },
         decline: row.decline ? JSON.parse(row.decline) : null,
         comments: await listComments(env, id),
+        invoice: row.kind === 'invoice' ? invoiceState(await listActions(env, id)) : undefined,
         updatedAt: row.updated_at,
       })
     }
@@ -207,6 +295,7 @@ async function handleApi(req: Request, env: Env, path: string[]): Promise<Respon
       await env.DB.batch([
         env.DB.prepare('DELETE FROM events WHERE share_id = ?').bind(id),
         env.DB.prepare('DELETE FROM comments WHERE share_id = ?').bind(id),
+        env.DB.prepare('DELETE FROM share_actions WHERE share_id = ?').bind(id),
         env.DB.prepare('DELETE FROM shares WHERE id = ?').bind(id),
       ])
       return json({ ok: true })
@@ -268,6 +357,62 @@ async function handleApi(req: Request, env: Env, path: string[]): Promise<Respon
     return json({ ok: true, decline })
   }
 
+  // ---- invoices: the client confirms or reports a payment; the owner reviews ----
+
+  if ((action === 'confirm' || action === 'payments' || action === 'review') && row.kind !== 'invoice') throw new HttpError(400, 'Only invoices support this')
+
+  if (action === 'confirm' && method === 'POST') {
+    const body = await readJson<{ name?: string; note?: string }>(req, 5000)
+    const name = str(body.name, 120)
+    if (!name) throw new HttpError(400, 'Please enter your name.')
+    const state = invoiceState(await listActions(env, id))
+    if (state.confirmation) throw new HttpError(409, `Already confirmed by ${state.confirmation.name}.`)
+    await addAction(env, id, 'confirm', { name, note: str(body.note, 1000), ip, userAgent: ua }, now)
+    return json({ invoice: invoiceState(await listActions(env, id)) }, 201)
+  }
+
+  if (action === 'payments' && method === 'POST' && !sub) {
+    const body = await readJson<{ name?: string; method?: string; amount?: number; reference?: string; paidOn?: string; note?: string; proof?: string }>(req, MAX_PROOF_BYTES + 5000)
+    const name = str(body.name, 120)
+    const payMethod = str(body.method, 40)
+    const amount = Math.round(Number(body.amount) * 100) / 100
+    if (!name) throw new HttpError(400, 'Please enter your name.')
+    if (!payMethod) throw new HttpError(400, 'Please choose how you paid.')
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1e12) throw new HttpError(400, 'Please enter the amount you paid.')
+    const proof = typeof body.proof === 'string' && body.proof ? body.proof : ''
+    if (proof && (!/^data:image\/(jpeg|png|webp);base64,/.test(proof) || proof.length > MAX_PROOF_BYTES)) throw new HttpError(400, 'The screenshot is too large or not an image.')
+    const actions = await listActions(env, id)
+    const state = invoiceState(actions)
+    if (state.paid) throw new HttpError(409, 'This invoice is already marked as paid.')
+    if (state.payments.length >= MAX_PAYMENT_REPORTS) throw new HttpError(429, 'Too many payment reports on this invoice.')
+    const data = { name, method: payMethod, amount, reference: str(body.reference, 120), paidOn: isoDate(body.paidOn) || new Date(now).toISOString().slice(0, 10), note: str(body.note, 1000), proof, ip, userAgent: ua }
+    await addAction(env, id, 'payment', data, now)
+    return json({ invoice: invoiceState(await listActions(env, id)) }, 201)
+  }
+
+  // GET /:id/payments/:paymentId/proof — the screenshot, for the owner only (kept out of polling).
+  if (action === 'payments' && sub && method === 'GET') {
+    requireOwner(req, row)
+    const a = await env.DB.prepare("SELECT data FROM share_actions WHERE share_id = ? AND id = ? AND type = 'payment'").bind(id, Number(sub)).first<{ data: string }>()
+    const proof = a ? (JSON.parse(a.data).proof as string) : ''
+    if (!proof) throw new HttpError(404, 'No screenshot')
+    return json({ proof })
+  }
+
+  if (action === 'review' && method === 'POST') {
+    requireOwner(req, row)
+    const body = await readJson<{ type?: string; paymentId?: number; reason?: string; paidOn?: string }>(req, 5000)
+    const state = invoiceState(await listActions(env, id))
+    if (body.type === 'payment_ok' || body.type === 'payment_rejected') {
+      const p = state.payments.find((x) => x.id === Number(body.paymentId))
+      if (!p) throw new HttpError(404, 'Payment not found')
+      await addAction(env, id, body.type, { paymentId: p.id, reason: str(body.reason, 500) }, now)
+    } else if (body.type === 'paid') await addAction(env, id, 'paid', { paidOn: isoDate(body.paidOn) || new Date(now).toISOString().slice(0, 10) }, now)
+    else if (body.type === 'unpaid') await addAction(env, id, 'unpaid', {}, now)
+    else throw new HttpError(400, 'Unknown review')
+    return json({ invoice: invoiceState(await listActions(env, id)) })
+  }
+
   if (action === 'comments' && method === 'POST') {
     const body = await readJson<{ name?: string; body?: string }>(req, 10_000)
     const text = str(body.body, 2000)
@@ -295,6 +440,7 @@ async function handleApi(req: Request, env: Env, path: string[]): Promise<Respon
       acceptance: row.acceptance ? JSON.parse(row.acceptance) : null,
       decline: row.decline ? JSON.parse(row.decline) : null,
       comments: await listComments(env, id),
+      invoice: row.kind === 'invoice' ? invoiceState(await listActions(env, id)) : undefined,
       views: { opens: o.opens ?? 0, visitors: o.visitors ?? 0, first: o.first ?? null, last: o.last ?? null },
       sections: sections.results,
       recent: recent.results,

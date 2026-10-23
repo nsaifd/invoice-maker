@@ -234,6 +234,10 @@ export interface Invoice {
   notes: string
   terms: string
   paidAt?: string
+  /** Payments received so far (an invoice can be paid in parts). */
+  payments?: Payment[]
+  /** The client confirmed the invoice from its share link. */
+  clientConfirmation?: { name: string; note: string; at: number }
   reminders?: Array<{ at: number; channel: 'email' | 'whatsapp' }>
   /** Per-invoice design; falls back to the default style in Settings. */
   style?: DocStyle
@@ -241,6 +245,18 @@ export interface Invoice {
   share?: ShareRef
   createdAt: number
   updatedAt: number
+}
+
+export interface Payment {
+  id: string
+  /** In whole currency units, like line-item rates. */
+  amount: number
+  method: string
+  reference: string
+  paidOn: string
+  note: string
+  /** Set when the client reported it from the share link and you confirmed it. */
+  reportId?: number
 }
 
 /** A published copy of a document on the server, reachable at /p/:id. */

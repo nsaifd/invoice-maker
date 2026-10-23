@@ -9,6 +9,8 @@ import { shareUrl, snapshot, timeAgo } from '../lib/share'
 import { InvoicePreview, ScaledPreview } from '../components/InvoicePreview'
 import { PrintPortal } from '../components/doc'
 import { ActivityPanel, CommentsPanel, SharePanel, useActivity } from '../components/SharePanel'
+import { ClientResponsePanel, PaymentList } from '../components/InvoicePayments'
+import { balance, setPaid } from '../lib/payments'
 import { Button, Field, Modal, PageHeader, StatusBadge, inputCls } from '../components/ui'
 
 export default function InvoiceView() {
@@ -18,7 +20,14 @@ export default function InvoiceView() {
   const inv = useLiveQuery(() => db.invoices.get(id).then((x) => x ?? null), [id])
   const rule = useLiveQuery(() => (inv?.recurringId ? db.recurring.get(inv.recurringId) : undefined), [inv?.recurringId])
   const [recurringOpen, setRecurringOpen] = useState(false)
-  const { activity, error, reload } = useActivity(inv?.share)
+  const { activity, error, reload } = useActivity(inv?.share, (a) => {
+    // Keep the client's confirmation with the invoice, so it shows on every device.
+    const c = a.invoice?.confirmation
+    if (c)
+      db.invoices.get(id).then((cur) => {
+        if (cur && !cur.clientConfirmation) db.invoices.update(id, { clientConfirmation: c })
+      })
+  })
 
   if (!settings || inv === undefined) return null
   if (inv === null)
@@ -33,6 +42,7 @@ export default function InvoiceView() {
 
   const status = displayStatus(inv)
   const total = formatMoney(calcTotals(inv).total, inv.currency)
+  const owed = balance(inv)
   const update = (patch: Partial<Invoice>) => db.invoices.update(id, { ...patch, updatedAt: Date.now() })
   const link = inv.share ? shareUrl(inv.share.id) : undefined
   const lastReminder = inv.reminders?.at(-1)
@@ -70,6 +80,8 @@ export default function InvoiceView() {
       number: '',
       status: 'draft',
       paidAt: undefined,
+      payments: undefined,
+      clientConfirmation: undefined,
       share: undefined,
       reminders: undefined,
       recurringId: undefined,
@@ -119,13 +131,20 @@ export default function InvoiceView() {
               <span className="text-sm font-medium text-zinc-500">Status</span>
               <StatusBadge status={status} />
             </div>
-            <div className="mt-4 text-sm text-zinc-500">Amount</div>
-            <div className="text-2xl font-semibold tracking-tight text-zinc-900">{total}</div>
+            <div className="mt-4 text-sm text-zinc-500">{owed.paid > 0 && inv.status !== 'paid' ? 'Balance due' : 'Amount'}</div>
+            <div className="text-2xl font-semibold tracking-tight text-zinc-900">{owed.paid > 0 && inv.status !== 'paid' ? formatMoney(owed.due, inv.currency) : total}</div>
+            {owed.paid > 0 && inv.status !== 'paid' && (
+              <div className="text-xs text-zinc-500">
+                {formatMoney(owed.paid, inv.currency)} of {total} paid
+              </div>
+            )}
             <dl className="mt-4 space-y-1.5 border-t border-zinc-100 pt-4 text-sm">
               <Row label="Issued" value={formatDate(inv.issueDate)} />
               <Row label="Due" value={formatDate(inv.dueDate)} />
               {inv.paidAt && <Row label="Paid on" value={formatDate(inv.paidAt)} />}
+              {inv.clientConfirmation && <Row label="Confirmed by" value={inv.clientConfirmation.name} />}
             </dl>
+            <PaymentList invoice={inv} />
             <div className="mt-5 grid gap-2">
               {inv.status === 'draft' && (
                 <Button variant="secondary" icon={Send} onClick={() => update({ status: 'sent' })}>
@@ -133,16 +152,18 @@ export default function InvoiceView() {
                 </Button>
               )}
               {inv.status !== 'paid' ? (
-                <Button variant="secondary" icon={CheckCircle2} className="!text-emerald-700" onClick={() => update({ status: 'paid', paidAt: todayISO() })}>
+                <Button variant="secondary" icon={CheckCircle2} className="!text-emerald-700" onClick={() => setPaid(inv, true)}>
                   Mark as Paid
                 </Button>
               ) : (
-                <Button variant="secondary" icon={RotateCcw} onClick={() => update({ status: 'sent', paidAt: undefined })}>
+                <Button variant="secondary" icon={RotateCcw} onClick={() => setPaid(inv, false)}>
                   Mark as Unpaid
                 </Button>
               )}
             </div>
           </div>
+
+          <ClientResponsePanel invoice={inv} activity={activity} onChanged={reload} />
 
           {inv.status === 'sent' && (
             <div className={`rounded-2xl border p-5 ${status === 'overdue' ? 'border-red-200 bg-red-50/40' : 'border-zinc-200'}`}>
@@ -189,7 +210,8 @@ export default function InvoiceView() {
             share={inv.share}
             dirty={!!inv.share && inv.updatedAt > inv.share.publishedAt}
             makeDoc={() => snapshot(settings, { invoice: inv })}
-            onChange={(share) => db.invoices.update(id, { share })}
+            // Sharing the link is sending it, so a draft becomes sent.
+            onChange={(share) => db.invoices.update(id, { share, ...(share && inv.status === 'draft' ? { status: 'sent' as const } : {}) })}
             message={{
               subject: `Invoice ${inv.number} from ${settings.businessName}`,
               body: `Hi ${inv.client.name},\n\nHere is invoice ${inv.number} for ${total}, due on ${formatDate(inv.dueDate)}. You can view and download it here:`,
